@@ -18,6 +18,11 @@ from bcutils.bc_utils import create_bc_session, get_barchart_downloads
 def main():
     parser = argparse.ArgumentParser(description="Barchart download runner")
     parser.add_argument("--config", required=True, help="path to yaml config")
+    parser.add_argument(
+        "--check-login",
+        action="store_true",
+        help="just log in to confirm credentials, then exit (no downloads)",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as stream:
@@ -39,6 +44,10 @@ def main():
             barchart_password=cfg["barchart_password"],
         )
     )
+
+    if args.check_login:
+        print("LOGIN OK — Barchart session created; credentials are valid.")
+        return
 
     get_barchart_downloads(
         session,
