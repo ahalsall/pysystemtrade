@@ -35,9 +35,22 @@ import traceback
 from syscore.constants import arg_not_supplied
 from syscore.fileutils import get_resolved_pathname
 
+from sysdata.csv.csv_futures_contract_prices import ConfigCsvFuturesPrices
 from sysinit.futures.contract_prices_from_split_freq_csv_to_db import (
-    BARCHART_CONFIG,
     init_db_with_split_freq_csv_prices_for_code,
+)
+
+# Current bc-utils writes the close column as "Latest" (older batches used
+# "Close"). The upstream split-freq config maps FINAL="Close", so we define our
+# own here to match current bc-utils output rather than patch the shared file.
+BARCHART_CONFIG = ConfigCsvFuturesPrices(
+    input_date_index_name="Time",
+    input_skiprows=0,
+    input_skipfooter=0,
+    input_date_format="%Y-%m-%dT%H:%M:%S",
+    input_column_mapping=dict(
+        OPEN="Open", HIGH="High", LOW="Low", FINAL="Latest", VOLUME="Volume"
+    ),
 )
 from sysinit.futures.rollcalendars_from_db_prices_to_csv import (
     build_and_write_roll_calendar,
