@@ -99,6 +99,14 @@ See `notes/strategy17_dynopt_repo_map.md`, `notes/backtest_roadmap.md`.
 
 ---
 
+## 5b. Production strategy wiring (IN PROGRESS, 2026-06-30)
+Strategy `rob_dynamic` = our rob_system + dynamic optimisation in production.
+- **Custom run class** (full rob_system stages in production): `sysproduction/strategy_code/run_rob_dynamic_system.py` → `runRobDynamicSystem` (the stock `runSystemCarryTrendDynamic` uses plain RawData and CAN'T run rob_system's asset-relative/skew/vol-atten rules — so we mirror the documented custom-run pattern with myFuturesRawData + volAttenForecastScaleCap + dynamic-opt stages).
+- **Config generator** (re-run as build-out grows): `sysinit/futures/make_rob_dynamic_config.py` → writes `private/systems/rob_dynamic/config.yaml` (rob_system config restricted to instruments we have data for; currently 18; base USD for now—CAD pending CAD FX rates; use_instrument_div_mult_estimates False).
+- **Registered** (both gitignored): `private/private_config.yaml` → strategy_list.rob_dynamic (load_backtests object=runRobDynamicSystem, reporting=report_system_dynamic) + strategy_capital_allocation (rob_dynamic 100%). `private/private_control_config.yaml` → run_systems.rob_dynamic (backtest_config_filename=private.systems.rob_dynamic.config.yaml) + run_strategy_order_generator.rob_dynamic (orderGeneratorForDynamicPositions).
+- **Capital:** set initial TOTAL capital 150000 (base ccy nominal) via dataCapital.create_initial_capital; update_strategy_capital allocated it (rob_dynamic in strategies-with-capital). Margin allocation errored (needs IB margin data; non-fatal for backtest).
+- **NEXT:** task #22 dry-run `update_system_backtests` → optimal positions (no orders; read-only + stack handler off). Then position limits, then (later) live.
+
 ## 5. Production / IB (roadmap only; not started)
 Full roadmap + ordered go-live checklist in `notes/production_ib_roadmap.md`. Headlines: IB Gateway (port 4001) + `ib_async` + IBC; Mongo+parquet via dataBlob; 3-level order stack; daily cron processes (run_systems → run_strategy_order_generator → run_stack_handler); freeze params for production; mandatory position limits + shadow_cost (in private_config) for dynamic opt.
 
