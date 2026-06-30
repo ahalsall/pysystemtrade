@@ -11,4 +11,5 @@ with Strategy 25 dynamic optimization against our Barchart price database.
 - concepts/ — conceptual knowledge base:
   - [concepts/portfolio_and_dynopt.md](concepts/portfolio_and_dynopt.md) — portfolio construction, vol targeting, IDM/FDM, dynamic optimization (Mr Greedy), mapped to rob_system config.
   - concepts/canada_tax_brokerage.md — Canada futures tax & IB brokerage vs UK (deep-research; in progress).
-  - [concepts/rob_reports.md](concepts/rob_reports.md) — Rob's public repos + his `reports` production diagnostics; static instrument selection by capital; the micros-not-in-bc-utils tension.: IB Gateway/ib_async, production processes, order stacks, dynamic-opt in production, go-live checklist.
+  - [concepts/rob_reports.md](concepts/rob_reports.md) — Rob's public repos + his `reports` production diagnostics; static instrument selection by capital; the micros-not-in-bc-utils tension.
+  - [concepts/costs_and_capital.md](concepts/costs_and_capital.md) — minimum capital per contract (why micros matter), the SR-cost screen (24 of our 224 too expensive), and how dynamic opt helps.: IB Gateway/ib_async, production processes, order stacks, dynamic-opt in production, go-live checklist.
