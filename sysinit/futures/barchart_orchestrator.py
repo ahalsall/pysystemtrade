@@ -107,8 +107,19 @@ def main():
 
     config = get_production_config()
     datapath = config.get_element_or_default("barchart_path", DEFAULT_DATAPATH)
-    download_list = config.get_element_or_default("barchart_download_list", [])
     dry_run = config.get_element_or_default("barchart_dry_run", False)
+
+    # instrument list comes from a file (if configured) or the inline list
+    list_file = config.get_element_or_default("barchart_download_list_file", None)
+    if list_file:
+        with open(os.path.expanduser(list_file), "r") as stream:
+            download_list = [
+                line.strip()
+                for line in stream
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+    else:
+        download_list = config.get_element_or_default("barchart_download_list", [])
 
     if not args.skip_download:
         download_stage(PRIVATE_CONFIG)

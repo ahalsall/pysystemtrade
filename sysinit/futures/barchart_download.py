@@ -22,23 +22,49 @@ from bcutils.bc_utils import (
 )
 
 
-def _patch_skip_hourly():
-    """Make bc-utils skip hourly downloads (daily-only mode).
+def _patch_download(daily_only: bool, max_downloads: int):
+    """Wrap bc-utils' per-contract download to add daily-only and a per-run cap.
 
-    bc-utils has no native daily-only switch: do_daily=True fetches BOTH daily
-    and hourly, do_daily=False fetches hourly only. We wrap its per-contract
-    download so any Hour_* path is treated as already-present (EXISTS), which
-    bc-utils skips without a network call or pause. Daily (Day_*) downloads run
-    normally. This avoids forking bc-utils.
+    bc-utils has no native daily-only switch (do_daily=True fetches BOTH daily
+    and hourly, False fetches hourly only) and no self-imposed download cap (it
+    only stops when the server reports the 250/day limit). We wrap
+    save_prices_for_contract so that:
+
+    * daily_only -> any Hour_* path returns EXISTS (skipped, no network/pause);
+    * once `max_downloads` actual downloads have happened this run, further
+      contracts return EXCEED, which makes bc-utils stop cleanly. This leaves
+      headroom under the server limit; skip-existing means the next run resumes.
     """
     original = bc_utils.save_prices_for_contract
+    state = {"downloaded": 0}
 
     def wrapper(session, contract, save_path, *args, **kwargs):
-        if os.path.basename(save_path).startswith("Hour"):
+        if daily_only and os.path.basename(save_path).startswith("Hour"):
             return HistoricalDataResult.EXISTS
-        return original(session, contract, save_path, *args, **kwargs)
+        if max_downloads and state["downloaded"] >= max_downloads:
+            logging.info(
+                f"Self-imposed cap of {max_downloads} downloads reached - stopping"
+            )
+            return HistoricalDataResult.EXCEED
+        result = original(session, contract, save_path, *args, **kwargs)
+        if result == HistoricalDataResult.OK:
+            state["downloaded"] += 1
+        return result
 
     bc_utils.save_prices_for_contract = wrapper
+
+
+def _resolve_instrument_list(cfg: dict) -> list:
+    """Instrument codes from a list file (if configured) or the inline list."""
+    list_file = cfg.get("barchart_download_list_file")
+    if list_file:
+        with open(os.path.expanduser(list_file), "r") as stream:
+            return [
+                line.strip()
+                for line in stream
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+    return cfg.get("barchart_download_list", [])
 
 
 def main():
@@ -79,17 +105,24 @@ def main():
         return
 
     daily_only = cfg.get("barchart_daily_only", False)
+    max_downloads = cfg.get("barchart_max_downloads", 0)
     if daily_only:
         print("Daily-only mode: hourly downloads will be skipped.")
-        _patch_skip_hourly()
+    if max_downloads:
+        print(f"Per-run download cap: {max_downloads}")
+    if daily_only or max_downloads:
+        _patch_download(daily_only, max_downloads)
 
     # daily-only needs do_daily=True so bc-utils iterates the daily resolution;
     # with do_daily=False it would only try hourly, which we skip -> nothing.
     do_daily = True if daily_only else cfg.get("barchart_do_daily", True)
 
+    instr_list = _resolve_instrument_list(cfg)
+    print(f"Instruments to download: {len(instr_list)}")
+
     get_barchart_downloads(
         session,
-        instr_list=cfg["barchart_download_list"],
+        instr_list=instr_list,
         save_dir=cfg["barchart_path"],
         start_year=cfg.get("barchart_start_year", 1950),
         end_year=cfg.get("barchart_end_year", 2025),
