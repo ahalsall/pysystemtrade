@@ -10,4 +10,5 @@ with Strategy 25 dynamic optimization against our Barchart price database.
 - [production_ib_roadmap.md](production_ib_roadmap.md) — taking a strategy live via Interactive Brokers
 - concepts/ — conceptual knowledge base:
   - [concepts/portfolio_and_dynopt.md](concepts/portfolio_and_dynopt.md) — portfolio construction, vol targeting, IDM/FDM, dynamic optimization (Mr Greedy), mapped to rob_system config.
-  - concepts/canada_tax_brokerage.md — Canada futures tax & IB brokerage vs UK (deep-research; in progress).: IB Gateway/ib_async, production processes, order stacks, dynamic-opt in production, go-live checklist.
+  - concepts/canada_tax_brokerage.md — Canada futures tax & IB brokerage vs UK (deep-research; in progress).
+  - [concepts/rob_reports.md](concepts/rob_reports.md) — Rob's public repos + his `reports` production diagnostics; static instrument selection by capital; the micros-not-in-bc-utils tension.: IB Gateway/ib_async, production processes, order stacks, dynamic-opt in production, go-live checklist.
