@@ -25,10 +25,20 @@ OUT = os.path.join(OUT_DIR, "config.yaml")
 
 
 def main():
+    import sys
+
     cfg = yaml.safe_load(open(ROB_CFG))
-    available = set(dbFuturesSimData().get_instrument_list())
     configured = set(cfg["instrument_weights"].keys())
-    use = sorted(available & configured)
+    if len(sys.argv) > 1:
+        # explicit instrument list (comma- or space-separated), intersect with rob config
+        requested = set(",".join(sys.argv[1:]).replace(",", " ").split())
+        use = sorted(requested & configured)
+        missing = sorted(requested - configured)
+        if missing:
+            print(f"NOTE: not in rob_system config (skipped): {missing}")
+    else:
+        available = set(dbFuturesSimData().get_instrument_list())
+        use = sorted(available & configured)
     if not use:
         raise SystemExit("No overlap between DB instruments and rob_system config")
 
