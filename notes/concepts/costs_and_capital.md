@@ -37,6 +37,7 @@ BOVESPA, BUTTER, CH10, CNH-onshore, COAL, COAL-GEORDIE, CZK, EU-MID, EURIBOR, EU
 1. **Backtesting now:** costs/min-capital don't block research — proceed with the data we have.
 2. **Production (IB):** prices come from IB for anything tradeable, so the barchart "no micros" gap disappears once live — we can trade & price NASDAQ_micro, GOLD_micro, SP500_micro, micro FX, etc. So the micros gap is mainly a *backtest data* limitation, not a live one.
 3. **Instrument selection (live):** start from the cost-screened set (<0.01 SR), prefer micro/mini for high-value underlyings, let dynamic opt size across them given our capital.
-4. **OPEN:** our trading capital → determines instrument count (~8 @ $10k … ~53 @ $1M from Static_selection_of_instruments) and which micros are mandatory.
+4. **Our capital: CAD ~150,000** (flexible to scale). ≈ USD ~110k (CAD/USD ~0.73). Per Static_selection_of_instruments (~28 @ $100k, ~35 @ $250k) ⇒ **~28-32 instruments** for a diversified live portfolio. That tier's selection leans on micros (EUR_micro, SP500_micro, COPPER-micro, GOLD_micro, NASDAQ_micro, KOSPI_mini…) → those are mandatory for live but come from IB.
+5. **Base currency (CAD vs USD) is an open decision** — affects vol targeting, FX conversion of USD-denominated futures, and ties to the Canada tax/FX workstream. Rob uses USD base. Worth deciding before production config.
 
 Sources: raw.githubusercontent.com/robcarver17/reports/master/{Costs_report,Minimum_capital_report,Remove_markets_report}
