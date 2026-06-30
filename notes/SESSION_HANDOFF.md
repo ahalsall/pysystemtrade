@@ -1,0 +1,107 @@
+# SESSION HANDOFF — pysystemtrade Barchart pipeline & AFTS strategy work
+
+**Purpose:** durable backup so this work can be fully resumed from a fresh session.
+**Last updated:** 2026-06-29 (work by Andrew Halsall + Claude).
+**Repo:** /home/andrew/pysystemtrade · branch `develop` · fork `ahalsall/pysystemtrade` (origin), upstream `robcarver17/pysystemtrade`.
+
+---
+
+## 0. Mission / goals
+1. Wire Barchart futures data into pysystemtrade for backtesting. ✅ done & verified.
+2. Automate barchart.com → CSV → parquet/mongo build-out within Barchart's daily download limit. ✅ done, cron live.
+3. Reproduce **AFTS Strategy 17** and apply **Strategy 25 dynamic optimization**, backtested on our Barchart data. ⏳ researched; blocked on S17 book definition.
+4. Eventually go to production / live trading via Interactive Brokers. 🔜 roadmap captured (notes/production_ib_roadmap.md).
+
+User context: Andrew (andrew.halsall@gmail.com). Has a Barchart **Premier** account (250 downloads/day). Has Rob Carver's *Advanced Futures Trading Strategies* (AFTS) book.
+
+---
+
+## 1. Environment & infrastructure (all set up)
+- **Python/deps:** project uses `uv`. Run via `uv run ...`. Tests need the dev extra: `uv run --extra dev pytest <path>`.
+- **MongoDB:** v8.0.12 running on 127.0.0.1:27017, db `production` (already had spread_costs + now FX, prices).
+- **Parquet store:** `/home/andrew/pysystemtrade/private/data/parquet` (layout: `futures_contract_prices/{Day@|Hour@|}INSTR#YYYYMM00.parquet`, `futures_adjusted_prices/INSTR.parquet`, `futures_multiple_prices/INSTR.parquet`, `spotfx_prices/`).
+- **Config:** `private/private_config.yaml` (GITIGNORED — holds Barchart credentials + parquet/mongo/barchart_* keys). NOT in git.
+- **SSH/git auth:** generated `~/.ssh/id_ed25519`, added to GitHub; `origin` is SSH (`git@github.com:ahalsall/pysystemtrade.git`); github.com in known_hosts. Pushes work without prompts.
+- **Spot FX:** 12 provided FX series loaded into parquet (backtest prerequisite for non-USD instruments).
+
+### Workflow rule (IMPORTANT)
+- This environment has **NO TTY**: interactive scripts (`input()`), `sudo`, and git credential prompts will hang/fail. Run interactive / long-running / live-data / real-DB-writing work in Andrew's OWN terminal.
+- Run non-interactive things through Claude (Bash) for fast fix-and-rerun loops.
+
+---
+
+## 2. Barchart data pipeline (BUILT & VERIFIED)
+Flow: barchart.com → [bc-utils] → split-freq CSVs → [our pipeline] → parquet/mongo → backtest.
+
+### bc-utils (the downloader)
+- Cloned at `~/bc-utils` with its OWN venv `~/bc-utils/.venv` (editable install). Kept separate so PST `pyproject.toml` stays clean for upstream syncs (PST env lacks requests/bs4).
+- By bug-or-feature (same author who contributes to PST). Writes `Day_INSTR_YYYYMM00.csv` / `Hour_INSTR_YYYYMM00.csv`.
+- **GOTCHAS (hard-won):**
+  - `barchart_end_year` is EXCLUSIVE (`range(start,end)`): use end=2026 to get 2025.
+  - Current bc-utils close column is **"Latest"** (older batches "Close").
+  - No native daily-only mode (`do_daily=True`=both, False=hourly-only). We added one.
+  - Skips already-downloaded files; delete CSV to force re-download.
+  - The split-freq loader MERGES existing DB hourly into a daily contract's Mixed series → stale `Hour@INSTR#...` parquet contaminates daily-only results. Wipe instrument parquet + roll calendar before reprocessing at a different frequency.
+
+### Our committed scripts (in `sysinit/futures/`)
+- `barchart_pipeline.py` — non-interactive 4-stage processor (contract prices→roll calendar→multiple→adjusted). Defines its OWN `BARCHART_CONFIG` (FINAL="Latest", date `%Y-%m-%dT%H:%M:%S` NO %z). Datapaths are DOTTED package paths (`private.data.futures.barchart`); a leading `./` resolves WRONG. CLI: `--instruments`, `--all`, `--stages`, `--datapath`, `--roll-calendar-path`.
+- `barchart_download.py` — standalone download runner, run BY the bc-utils venv. Reads barchart_* keys from a yaml config. Flags `--config`, `--check-login`. Supports `barchart_daily_only`, `barchart_max_downloads` (cap → returns EXCEED), `barchart_download_list_file`.
+- `barchart_orchestrator.py` — run in PST env: download (subprocess to bc-utils venv) → process → verify. Flags `--skip-download`, `--skip-verify`, `--process-all`. Env overrides: BC_UTILS_DIR, BC_UTILS_VENV_PYTHON, PST_PRIVATE_CONFIG.
+- `barchart_buildout_instruments.txt` — 224 instruments (Rob's full list ∩ bc-utils CONTRACT_MAP = downloadable).
+
+### Verified end-to-end
+AEX, 2024, daily-only: 12 contracts downloaded → 242 clean daily adjusted rows (2024-01-16→12-20, 0 intraday dupes) → backtest read OK (forecasts/positions/account curve). Cap tested live (max=5 → stopped at exactly 5).
+
+---
+
+## 3. Build-out strategy (LIVE via cron)
+- Goal: build out all 224 downloadable instruments, full history, daily-only, within 250/day limit.
+- `private/private_config.yaml` barchart keys: credentials; `barchart_path: /home/andrew/pysystemtrade/private/data/futures/barchart`; `barchart_download_list_file: .../sysinit/futures/barchart_buildout_instruments.txt`; `barchart_start_year: 1980`; `barchart_end_year: 2026`; `barchart_dry_run: False`; `barchart_do_daily: True`; `barchart_daily_only: True`; `barchart_max_downloads: 225`.
+  - NOTE: during the live cap test these were temporarily narrowed; current state may show test scope (AEX/2024) if not reset — CHECK and reset to the build-out values above for production build-out.
+- **System crontab (live):**
+  `0 8 * * * /home/andrew/.local/bin/uv run --directory /home/andrew/pysystemtrade python -m sysinit.futures.barchart_orchestrator --process-all >> /home/andrew/pysystemtrade/private/logs/barchart_buildout.log 2>&1`
+- Each run: ≤225 daily downloads (newest-first, breadth across instruments), stop at cap, process all CSVs, verify. skip-existing → resumes next day. Early runs will show many per-instrument processing failures (insufficient contracts) — expected; they succeed as history accumulates.
+- Pause: comment the crontab line. Log: `private/logs/barchart_buildout.log`.
+- 357 of Rob's instruments (minis/micros, -ICE/-SGX/-MEFF variants, exotics) are NOT in bc-utils CONTRACT_MAP — can't be pulled this way.
+
+### Scheduled session monitor
+- CronCreate job `0aecc192` (session-only, in-memory) fires **Jun 30 09:33** to read the build-out log and report. Dies if this Claude session closes — if so, just ask "check the build-out log".
+
+---
+
+## 4. AFTS Strategy 17 + dynamic optimization (RESEARCHED; pending S17 def)
+See `notes/strategy17_dynopt_repo_map.md`, `notes/backtest_roadmap.md`.
+- **KEY:** `systems/provided/rob_system/` is the AFTS template (full rule family + dynamic opt + vol attenuation + grouped weights). Use as the base. `run_system.py::futures_system(sim_data=..., config_filename="systems.provided.rob_system.config.yaml")` — defaults to dbFuturesSimData(); pass our `dbFuturesSimData()` (already reads our Barchart data).
+- Dynamic optimization (Strategy 25) already implemented: `systems/provided/dynamic_small_system_optimise/` (greedy integer optimizer). Config `small_system:` in defaults.yaml (shadow_cost, tracking_error_buffer, cost_multiplier, shrink_instrument_returns_correlation).
+- Production dynamic-opt: `sysproduction/strategy_code/run_dynamic_optimised_system.py`, `sysexecution/strategies/dynamic_optimised_positions.py`.
+- Doc caveat: `systems.futures.rules.ewmac` does NOT exist — use `systems.provided.rules.ewmac`.
+- **BLOCKED ON:** Strategy 17's exact book definition — which rules/forecasts + weights, instrument scope, fixed vs estimated, vol target/capital. Once provided: build S17 config on rob_system + dbFuturesSimData, run, validate Sharpe/curve, then tune dynamic-opt.
+
+---
+
+## 5. Production / IB (roadmap only; not started)
+Full roadmap + ordered go-live checklist in `notes/production_ib_roadmap.md`. Headlines: IB Gateway (port 4001) + `ib_async` + IBC; Mongo+parquet via dataBlob; 3-level order stack; daily cron processes (run_systems → run_strategy_order_generator → run_stack_handler); freeze params for production; mandatory position limits + shadow_cost (in private_config) for dynamic opt.
+
+---
+
+## 6. Git state (as of handoff)
+- Branch `develop`, in sync with `origin/develop` (before committing `notes/`).
+- Our commits on top of upstream merge `a4b41547`:
+  - `0f3c70c8` build-out strategy (cap + list-file)
+  - `18ead3f8` bc-utils Latest format + daily-only
+  - `464e8966` --check-login flag
+  - `2614f0af` download + orchestrator
+  - `88a62975` pipeline runner
+  - `812944dd` uv.lock gitignore
+- `private/` is gitignored (credentials, parquet, CSVs, logs never committed).
+- `notes/` being committed alongside this handoff.
+
+---
+
+## 7. How to resume in a fresh session
+1. Read this file + the 3 roadmaps in `notes/` + memory (`MEMORY.md` index points to barchart-pipeline-project, run-python-and-tests).
+2. Check git: `git -C /home/andrew/pysystemtrade log --oneline -8`, `git status -sb`.
+3. Check build-out progress: `tail` `private/logs/barchart_buildout.log`; count instruments with adjusted prices: `uv run python -c "from sysproduction.data.prices import diagPrices; print(len(diagPrices().db_futures_adjusted_prices_data.get_list_of_instruments()))"`.
+4. Confirm cron still installed: `crontab -l | grep barchart`.
+5. If reset needed, the build-out config values are in §3.
+6. Next action: get Strategy 17 definition → implement on rob_system + dbFuturesSimData → backtest.
