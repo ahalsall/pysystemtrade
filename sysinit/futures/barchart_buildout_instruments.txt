@@ -1,11 +1,13 @@
 # Build-out instrument universe for the barchart downloader.
-# = instruments in Rob Carver's full instrument list that are also in
-#   bc-utils CONTRACT_MAP (i.e. actually downloadable from Barchart).
-# One PST instrument code per line. Blank lines and # comments ignored.
+# = Rob Carver's instruments that are in bc-utils CONTRACT_MAP (downloadable from Barchart)
+#   AND tradeable from Canada via IB. One PST code per line; blank/# lines ignored.
 # Loaded via barchart_download_list_file in the private config.
+# NOTE: 6 LME instruments removed from the active list (2026-06-30) — IB's LME access
+#   is synthetic OTC, excluded for Canada residents (untradeable live; redundant with
+#   COMEX). Kept below as research-only (commented out so they are NOT downloaded).
+#   See notes/concepts/ib_canada_instruments_and_data.md. Uncomment to pull for research.
 AEX
 ALUMINIUM
-ALUMINIUM_LME
 AUD
 AUDJPY
 BB3M
@@ -45,7 +47,6 @@ COCOA_LDN
 COFFEE
 COPPER
 COPPER-micro
-COPPER_LME
 CORN
 CORN_mini
 COTTON
@@ -133,7 +134,6 @@ JGB-SGX-mini
 JP-REALESTATE
 JPY
 KRWUSD
-LEAD_LME
 LEANHOG
 LIVECOW
 LUMBER-new
@@ -149,7 +149,6 @@ MUMMY
 MXP
 NASDAQ
 NASDAQ_micro
-NICKEL_LME
 NIFTY
 NIKKEI
 NIKKEI400
@@ -193,7 +192,6 @@ SUGAR11
 SUGAR16
 SWISSLEAD
 TECDAX
-TIN_LME
 TOPIX
 US-DISCRETE
 US-ENERGY
@@ -226,4 +224,11 @@ WHEAT_mini
 WHEY
 YENEUR
 ZAR
-ZINC_LME
+
+# --- research-only (NOT tradeable from Canada; uncomment to download for research) ---
+# ALUMINIUM_LME
+# COPPER_LME
+# LEAD_LME
+# NICKEL_LME
+# TIN_LME
+# ZINC_LME
