@@ -30,3 +30,15 @@ IB gives ~3-4 yr of CONTINUOUS history + the current front month, but NOT deep h
 - Barchart build-out → deep multi-decade history accumulating in background for robust forecast fitting.
 
 Net: IB gets us to a USABLE full-coverage state immediately (solves covariance degeneracy + expired-contract execution gap); barchart deepens history over time. Confirm subscription/depth behaviour on the LIVE account before relying on it.
+
+## Seeding test (sysinit/futures/seed_price_data_from_IB.py), AEX, 2026-06-30
+`seed_price_data_from_IB('AEX')` works: it asks the broker for the instrument's contract dates (from roll config, allow_expired=True) and pulls hourly+daily per contract from IB into parquet.
+- IB returned data ONLY for recent+forward contracts: AEX 20250700→20260900 (14→248 daily lines, growing toward front); ALL older (2024, early 2025) → Error 162 "HMDS query returned no data" (expired, not retained). Confirms ~recent-only per-contract depth (deeper for liquid US contracts per the ContFuture test).
+- Per-contract depth here ≈ ~12 months (varies by instrument liquidity).
+
+### KEY GOTCHA: data gaps stall the roll/adjusted chain
+After seeding, AEX adjusted series stayed at 2024 (242 rows, ends 2024-12-20) and priced contract stayed 20241200 (expired) — even though IB's 2026 contracts are in the DB. Reason: barchart gave 2024 contracts, IB gave 2025-07→2026, but Jan-Jun 2025 is MISSING from both (IB doesn't retain those). The roll calendar can't bridge the gap, so multiple/adjusted stop at 2024 and the priced contract doesn't advance to a current one.
+Implications:
+- To get a CURRENT priced contract + continuous recent adjusted series from IB, need either (a) a CLEAN pure-IB seed per instrument (IB's recent run is continuous ~2025-07→2026 → builds a clean ~1yr series + current contract), not mixed with partial barchart that leaves gaps; or (b) continuous coverage (barchart build-out fills the 2025 gap over time); or (c) production roll-status tooling to advance the priced contract to the live front month.
+- So IB seeding alone doesn't auto-produce a current priced contract when mixed with gappy historical data; roll continuity matters.
+RECOMMENDED for immediate usability: pure-IB recent seed (clean per-instrument) → contemporaneous recent series across all instruments (fixes covariance) + current contracts (fixes execution); barchart fills/deepens. Production uses update_sampled_contracts + roll status to keep the priced contract current.
