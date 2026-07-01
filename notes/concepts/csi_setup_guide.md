@@ -20,6 +20,33 @@ Note the **permission model** (already set up here): raw CSI lands in the `csi`-
 `private/data/futures/csi/`; our pipeline (andrew) reads it and STAGES renamed files into
 `private/data/futures/csi_ingest/` (andrew-owned). Keeps the CSI feed and our processing cleanly separated.
 
+## Concrete setup (DECIDED 2026-07-01, this host) — KVM/QEMU
+Host is ready: Intel VT-x, /dev/kvm live, andrew in libvirt+kvm groups, default NAT
+net active (gateway **192.168.122.1** = how the guest reaches host Samba), 93GiB RAM /
+22 cores / 1.5TB free. virtio-win 0.1.285 ISO downloaded to `~/VMs/iso/virtio-win.iso`.
+Chosen: **KVM + Samba(force user=csi) + headless autostart** (see instrument work notes).
+
+1. ISOs → system pool (qemu:///system can't read /home): download Win11 ISO from
+   microsoft.com/software-download/windows11 → `~/VMs/iso/Win11.iso`, then
+   `sudo mv ~/VMs/iso/{Win11.iso,virtio-win.iso} /var/lib/libvirt/images/`.
+2. `sudo apt install -y ovmf swtpm swtpm-tools samba` (UEFI+TPM for Win11).
+3. Samba: share snippet is at `~/VMs/csi_share.smb.conf` (path=csi landing dir,
+   force user/group=csi, valid users=andrew). `sudo tee -a /etc/samba/smb.conf < ~/VMs/csi_share.smb.conf`;
+   `sudo smbpasswd -a andrew`; `testparm`; `sudo systemctl restart smbd`; if ufw active
+   `sudo ufw allow in on virbr0 to any port 445 proto tcp`.
+4. Create VM (opens virt-viewer for the install):
+   `virt-install --name win11-csi --osinfo win11 --memory 8192 --vcpus 4 --cpu host-passthrough
+   --disk path=/var/lib/libvirt/images/win11-csi.qcow2,size=64,bus=virtio,format=qcow2
+   --disk path=/var/lib/libvirt/images/virtio-win.iso,device=cdrom --cdrom /var/lib/libvirt/images/Win11.iso
+   --network network=default,model=virtio --boot uefi --tpm emulator,model=tpm-crb,version=2.0
+   --graphics spice --video qxl --sound none`
+5. Win install: at empty disk step → Load driver → virtio CD `amd64\w11` → viostor. Skip MS
+   account via Shift+F10 `oobe\bypassnro` (or detach NIC temporarily).
+6. Guest: run `virtio-win-guest-tools.exe` from the virtio CD (net/balloon/spice). Map drive
+   `\\192.168.122.1\csi` as Z: (user andrew + samba pw, reconnect at sign-in). Install UA →
+   ASCII export `Time,Open,High,Low,Close,Volume`, files `<SYM>_<YYYYMM>.csv` → Z:\, daily.
+7. Headless: `virsh autostart win11-csi`; Windows auto-login (netplwiz) + UA in Task Scheduler.
+
 ## 1. Windows VM on Linux
 Two solid options:
 - **KVM/QEMU + virt-manager** (native to Linux, best performance). Install: `sudo apt install qemu-kvm libvirt-daemon-system virt-manager`. Create a Windows 10/11 VM.

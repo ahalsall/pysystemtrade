@@ -79,6 +79,11 @@ offering / our subscriptions change.
 - Full: needs a HEALTHY Gateway (farms connected, not just the port open). A competing IB
   login breaks the Gateway's upstream link → all requests time out; reconnect first.
 - ib_config currently lists 584 instruments (the probe's default universe).
+- RESULT (full run 2026-07-01, healthy Gateway): **483 TRADEABLE, 101 UNTRADEABLE**
+  (6 LME region-blocked + 95 `missingContract`). Snippet in `private/trading_restrictions.yaml`
+  (gitignored). TODO before finalizing: review likely false-positives that are config/symbol
+  mismatches, not true untradeables (e.g. BRENT, COTTON, ETHANOL trade under alt codes;
+  EDOLLAR is genuinely dead → Eurodollar retired for SOFR). Safe as-is (restrict = don't trade).
 
 ## Sequencing
 1. CSI-backfill the broad research set (501) → good backtests + fitting.
