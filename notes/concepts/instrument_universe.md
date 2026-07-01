@@ -1,61 +1,87 @@
-# Instrument universe: research set vs live tradeable portfolio
+# Instrument universe: research set, live tradeable set, and the broker-tradeable adjunct
 
-Two DISTINCT sets — conflating them is a mistake. Decide/maintain both explicitly.
+Three related lists — keep them distinct. Do NOT hard-lock the tradeable set to a
+capital number; PST self-scales (see below).
 
-## 1. Research / backtest universe (BROAD — more data is better)
+## 1. Research / backtest (SIM) universe — BROAD (more data = better)
 Purpose: fit forecasts, estimate correlations/diversification, run cross-sectional
-rules (relative momentum, cross-sectional MR need many instruments per asset class).
-Cost/capital/tradeability do NOT constrain this. This is the **CSI deep-history
+rules. Cost/capital/tradeability do NOT constrain this. The **CSI deep-history
 download target**.
+- Computed 2026-07-01: Rob's full list (581) ∩ has rollconfig ∩ in IB config = **501**.
+- Include LME here (data-only for research) even though not live-tradeable from Canada.
+- → Pull CSI deep history for as much of the 501 as CSI covers.
 
-Definition (computed 2026-07-01): Rob's full instrument list (581) ∩ has rollconfig
-∩ in IB config = **501 instruments** (buildable + IB-known). Include LME here too
-(data-only, for research) even though not live-tradeable from Canada.
-→ Pull CSI deep history for as much of this 501 as CSI covers.
+## 2. Live tradeable set — CONFIGURED BROAD, self-scales with capital (NOT locked)
+The dynamic optimiser picks daily positions from the sim universe MINUS the exclusion
+lists (section 3). We do NOT lock a "~30 at CAD 150k" list. Instead:
 
-## 2. Live tradeable portfolio (CURATED — for real orders at ~CAD 150k)
-Purpose: the set dynamic optimization picks daily positions from. Must pass ALL
-live constraints. Dynamic opt then chooses the sparse actual holdings.
+### Capital is (mostly) automatic — verified in code/docs
+- Daily P&L → capital: **automatic**. `update_total_capital` polls the IB account value
+  daily; with **full compounding** (`syscore/capital.py: full_compounding`) the capital
+  base tracks the account. Never hand-edited for trading gains.
+- Deposits/withdrawals: **one manual entry**. Run `interactive_update_capital_manual`
+  once to flag the jump as new cash, not profit (else the daily poll absorbs it or trips
+  the >10% safety filter — docs/production.md:1894). Then it flows automatically.
+- Strategy allocation: **automatic**. `update_strategy_capital` re-allocates total capital
+  to strategies daily (our rob_dynamic @ 100%).
+→ Allocating more funds = deposit at IB + ONE `interactive_update_capital_manual` entry.
+  No re-selection, no config rebuild.
 
-Hard constraints (apply to us):
-- **IB-Canada tradeable**: in IB config; EXCLUDE **LME** (6: ALUMINIUM_LME, COPPER_LME,
-  LEAD_LME, NICKEL_LME, TIN_LME, ZINC_LME — IB's LME is synthetic OTC, blocked for Canada).
-  Also exclude anything IB Canada blocks / regulatory bad_markets.
-- **Cost**: SR cost per trade < ~0.01 (Rob's screen). MUST compute on OUR data (see below).
-- **Capital-appropriate**: a single contract's minimum capital must be a sane fraction
-  of ~USD 110k so we can diversify → favors MICRO/MINI for high-value underlyings
-  (SP500_micro, NASDAQ_micro, GOLD_micro, COPPER-micro, EUR_micro, *_mini). Micros are
-  IB-tradeable (data via IB).
-- **Liquidity**: enough that we (tiny) can fill a few contracts. NOTE: Rob's
-  Remove_markets volume thresholds ($1.5m ann-risk/day, 100 contracts/day) are
-  INSTITUTIONAL-scale and TOO STRICT for us — they over-exclude (and flag micros as
-  low $-notional). Use a size-appropriate liquidity bar, not Rob's wholesale.
+### Affordability is handled continuously by dynamic opt
+The greedy optimiser ("Mr Greedy", AFTS S25) builds the integer-contract portfolio that
+best tracks the risk-optimal portfolio, subject to costs + position limits. An instrument
+whose single contract is too big for its risk share at current capital is simply **held
+at zero** — not an error, just not selected. So we can CONFIGURE more instruments than we
+can currently afford; they **come online automatically** as capital grows. No re-run.
 
-### KEY PRINCIPLE: screen on OUR data, not Rob's
-Rob's Costs/Liquidity/Remove_markets/Static_selection reports use HIS data and HIS
-(large) capital. His cost report also has coverage gaps for micros/newer names (they
-default to "excluded" in a naive filter). So use them as a STARTING guide, but finalize
-the tradeable set with pysystemtrade's OWN reports run on OUR data once we have it:
-`interactive_controls` (auto-populate position limits, cost/liquidity screens),
-Costs/Liquidity/Remove-markets reports on our DB, Minimum_capital_report. This is the
-guideline-compliant way and ties into the QA audit (task #25).
+### Membership screens are config-driven and PERIODIC (not per-capital)
+What is genuinely "set" is config: the exclusion lists (section 3), per-instrument
+`position_limit_contracts`/`position_limit_weight`. Re-run the screening reports
+occasionally (quarterly-ish) via `interactive_controls` + Costs/Liquidity/Remove-markets
+on OUR data to add newly-liquid or retire degraded instruments. Maintenance, not
+capital-driven. Screen on OUR data, not Rob's (his thresholds are institutional-scale
+and over-exclude at our size; his cost report also has coverage gaps for micros).
 
-### Starting seed (Rob's Static_selection @ capital, minus LME — refine with our data)
-Rob's own capital-based selection (cost+liquidity+capital+diversification optimized on
-his data) is the best available seed:
-- ~$100k → 28 instruments; ~$250k → 35; ~$500k → 46 (scales with capital).
-- At our ~CAD 150k (~USD 110k) → interpolate ~30 instruments; heavy on micros/minis +
-  cheap diversifiers (V2X, IRON, MXP, RUBBER, CORN, EU sector indices, KOSPI_mini,
-  SP500_micro, EUR_micro, KRWUSD_mini, etc.).
-Take Static_selection @ ~$100-250k, drop LME, then re-screen cost/liquidity on OUR data.
+## 3. Broker-tradeable adjunct — PST's built-in `exclude_instrument_lists`
+This answers "how do we stop dynamic opt selecting an instrument we can't actually trade
+at IB?" PST has a three-tier mechanism in `sysdata/config/defaults.yaml:349`, overridable
+in `private_config.yaml` (the defaults note the lists are "regionally biased — override in
+private_config"). This is exactly our IB-Canada tradeability list (its complement):
+
+- **ignore_instruments** — dropped from backtests entirely (no data even in sim opt).
+  Use for instruments with no accurate data yet. Prices still collected/rolled in prod.
+- **trading_restrictions** — CAN'T TRADE (broker/region). Kept in sim data (for
+  correlations), but for the dynamic strategy it's treated as **don't-trade** in sim and
+  added to the production **reduce_only** list. ← this is where our IB-Canada-untradeable
+  instruments (incl. LME) go.
+- **bad_markets** — too expensive / illiquid. Same treatment. Auto-suggested by
+  `interactive_controls` / Remove_markets on our data.
+
+### No mis-/under-allocation — the guarantee (verified in code)
+`optimised_positions_stage.get_reduce_only_instruments()` →
+`get_list_of_markets_not_trading_but_with_data()` feeds these lists into the optimiser as
+**per-instrument box constraints** (`set_up_constraints.py`): `reduce_only` forces the
+position to only move toward zero (from a flat book → stays 0); `no_trade` locks at prior.
+Because the constraint is applied *inside* the optimisation (not "optimise then filter"),
+the risk that would have gone to an untradeable instrument is **redistributed to tradeable
+ones** in the same solve. So the optimal *tradeable* portfolio is what's produced — we are
+NOT left under-allocated. `reduce_only` in production is also the belt-and-suspenders: it
+will never OPEN a new position in a restricted instrument, only close one.
+
+### Action: build the IB-Canada tradeable probe → trading_restrictions
+Programmatically determine, per instrument in the sim universe, whether IB Canada offers a
+tradeable contract + we hold market data (reuse the IB contract-details/liquidity probes).
+The COMPLEMENT (sim universe − IB-tradeable, incl. LME) becomes `trading_restrictions` in
+private_config.yaml. Re-run periodically as IB's offering / our subscriptions change.
 
 ## Sequencing
-1. CSI deep history for the broad research set (501) → good backtests + fitting.
-2. Compute OUR cost/liquidity/min-capital via PST reports on our data.
-3. Finalize the live tradeable portfolio (~30 at current capital; scales if we add capital).
-4. Dynamic opt trades the tradeable set; research set stays broad for strategy work.
+1. CSI-backfill the broad research set (501) → good backtests + fitting.
+2. Build the IB-Canada tradeable probe → set `trading_restrictions` (untradeable complement).
+3. Run OUR Costs/Liquidity/Remove-markets/Min-capital reports → set `bad_markets` + limits.
+4. Dynamic opt then trades the tradeable, cost-OK, affordable subset — self-scaling with capital.
 
-## Open decisions for Andrew
-- Capital tier to size the tradeable set (150k now; scale later?).
-- Research breadth: full 501, or trim (e.g., drop instruments with no realistic future use)?
-- Confirm micros are acceptable for the live book (they are the capital-efficiency lever).
+## Decisions (2026-07-01)
+- Research/CSI breadth: **full 501** (broad; can trim later if some are truly never useful).
+- Micros/minis: **yes** — the capital-efficiency lever for high-value underlyings.
+- Tradeable set: **not locked** — configured broad; capital + dynamic opt + the exclusion
+  lists determine what's actually held; ~30 is merely what's effectively active at ~CAD 150k.
