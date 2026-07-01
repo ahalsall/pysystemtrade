@@ -134,6 +134,15 @@ def main():
     else:
         instruments = list(download_list)
 
+    # never process instruments that are managed via IB (their DB data is
+    # IB-seeded / roll-corrected; reprocessing from barchart would clobber it)
+    exclude = set(config.get_element_or_default("barchart_process_exclude", []))
+    if exclude:
+        skipped = sorted(set(instruments) & exclude)
+        instruments = [i for i in instruments if i not in exclude]
+        if skipped:
+            print(f"Excluding IB-managed instruments from processing: {skipped}")
+
     if not instruments:
         print("No instruments to process. Nothing to do.")
         return
