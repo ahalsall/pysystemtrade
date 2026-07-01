@@ -68,11 +68,17 @@ ones** in the same solve. So the optimal *tradeable* portfolio is what's produce
 NOT left under-allocated. `reduce_only` in production is also the belt-and-suspenders: it
 will never OPEN a new position in a restricted instrument, only close one.
 
-### Action: build the IB-Canada tradeable probe → trading_restrictions
-Programmatically determine, per instrument in the sim universe, whether IB Canada offers a
-tradeable contract + we hold market data (reuse the IB contract-details/liquidity probes).
-The COMPLEMENT (sim universe − IB-tradeable, incl. LME) becomes `trading_restrictions` in
-private_config.yaml. Re-run periodically as IB's offering / our subscriptions change.
+### Action: IB-Canada tradeable probe → trading_restrictions  [BUILT]
+`sysinit/futures/ib_tradeability_probe.py` determines, per instrument in the sim universe,
+whether IB Canada offers a tradeable contract (metadata + current contract chain + a real
+contract resolves) and optionally whether we hold market data (`--check-market-data`). The
+COMPLEMENT (untradeable, incl. LME which IB resolves but Canada can't trade) is emitted as a
+`trading_restrictions` YAML snippet for private_config.yaml. Re-run periodically as IB's
+offering / our subscriptions change.
+- Offline (no Gateway): `--no-connect` classifies LME + not-in-ib-config (validated: flags the 6 LME).
+- Full: needs a HEALTHY Gateway (farms connected, not just the port open). A competing IB
+  login breaks the Gateway's upstream link → all requests time out; reconnect first.
+- ib_config currently lists 584 instruments (the probe's default universe).
 
 ## Sequencing
 1. CSI-backfill the broad research set (501) → good backtests + fitting.
