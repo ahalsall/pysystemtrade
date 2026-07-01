@@ -71,16 +71,27 @@ def report(codes, data):
         try:
             pc = contracts.get_priced_contract_id(code)
             fc = futuresContract(code, pc)
-            okay = broker.is_contract_okay_to_trade(fc)
             hours = broker.get_trading_hours_for_contract(fc)
+            # status + next-open derived from the SAME hours object + datetime.now()
+            # (consistent with PST's tradingHours.okay_to_trade_now, which uses naive now)
+            okay = hours.okay_to_trade_now()
         except Exception as e:
             print(f"  {code:14s} ERROR {type(e).__name__}: {str(e)[:80]}")
             errors.append(code)
             continue
 
+        now = datetime.datetime.now()
+        all_sessions = sorted((h.opening_time, h.closing_time) for h in hours)
+        if okay:
+            current = next(((o, c) for o, c in all_sessions if o <= now <= c), None)
+            next_event = f"closes {current[1]:%b-%d %H:%M}" if current else "-"
+        else:
+            future_opens = [o for o, c in all_sessions if o > now]
+            next_event = f"opens {min(future_opens):%b-%d %H:%M}" if future_opens else "-"
+
         status = "OPEN " if okay else "CLOSED"
         (open_now if okay else closed_now).append(code)
-        print(f"{code:14s} [{exch.get(code,'?'):8s}] {pc}  NOW: {status}")
+        print(f"{code:14s} [{exch.get(code,'?'):8s}] {pc}  NOW: {status}  NEXT: {next_event}")
 
         by_day = _sessions_by_day(hours)
         if by_day:
