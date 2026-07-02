@@ -357,6 +357,37 @@ For each instrument we intend to trade:
 - Treating the Panama-adjusted price as a return series → rolldown bias; use per-contract prices
   for % returns (pysystemtrade already does this).
 
+### 5.5 Validation pass + Batch-1 results (2026-07-02)
+**Process reconciliation (honest):** Rob's docs are explicit that roll-calendar building is
+"careful craftsmanship, **not** suited to a batch process… run for each instrument in turn",
+generate → **check (monotonic + valid)** → **manually review**. Our CSI ingest
+(`csi_pipeline --instruments all`) ran it **batched with `check_before_writing=False`** — so we
+applied Rob's *parameters* correctly but circumvented his *process* (batch, no checks, no review,
+and we ignored his shipped calendars). That is the crux of QA task #25 for rolls.
+
+**What we built:** `sysinit/futures/validate_roll_calendars.py` — restores the monotonic+valid
+checks AND cross-checks the **held-contract sequence** against Rob's shipped calendars
+(`data/futures/roll_calendars_csv/`, which he hand-crafted and, for minis, derives from main-size
+contracts) via an identical daily forward-fill on both → % of overlapping days we hold the same
+contract Rob does. Run: `uv run python -m sysinit.futures.validate_roll_calendars --instruments all`.
+
+**Batch-1 result (35 instruments): 27 clean (match Rob 91–100%), 8 flagged:**
+- **Broken:** `SOYMEAL`, `SOYOIL` → **not monotonic** (rebuild/hand-edit). `GAS_US_mini` → 3% /
+  14 rolls (thin-contract break — §5.2; fix = source deep history from **main-size** `GAS_US`,
+  which is Rob's own method per docs/data.md "mini prices calculated from main-size contracts").
+- **Diverge from Rob (valid+monotonic but different held month):** `RICE` 23%, `KOSPI_mini` 31%,
+  `LEANHOG` 34%, `LIVECOW` 49% — seasonal ags where our data-driven roll lands on different
+  contracts than Rob. Needs the craftsmanship review (and is where re-reading AFTS Part Six / the
+  seasonal delivery-month discussion would confirm intent). `GOLD_micro` 80% borderline.
+- The 91–100% matches are strong validation that the generator + `rollconfig` params are correct.
+
+**General rule confirmed:** research/backtest deep history should come from the **most-liquid
+(usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
+underlying → identical Panama price series, only the multiplier (in config) differs.
+
+**Still open (per §5.3):** first-notice/delivery timing audit for physically-settled names; fix
+the 8 flagged; then re-validate. Do NOT batch the fixes — per-instrument.
+
 ---
 
 ## 6. Source list (Rob Carver blog posts, books, and repo code/docs)

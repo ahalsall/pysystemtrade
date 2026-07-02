@@ -6,11 +6,16 @@
 
 ---
 
-## ⏱ RESUME HERE (2026-07-01 evening)
-**CSI deep-history pipeline is VALIDATED END-TO-END.** Today: built a KVM/Windows-11 VM
-running Unfair Advantage, Samba share (Z: → csi landing dir), and ran the first real export
-all the way to the DB — **AEX 30yr (1996→2026, 7946 adj prices) + ALUMINIUM 7yr**, with
-correct PRICE/FORWARD/CARRY. See notes/concepts/csi_setup_guide.md ("Validated END-TO-END").
+## ⏱ RESUME HERE (2026-07-02)
+**CSI Batch 1 (35 live-tradeable instruments) INGESTED + roll-VALIDATED.** From the
+Windows/UA VM built 07-01, exported 35 instruments (4,912 contracts) → map-built → deep-history
+adjusted prices in the DB (most 20–30yr; AEX 30yr). Symbol map fully resolved
+(`private/data/futures/csi_symbol_map.csv`, 35 verified). Roll QA pass built + run:
+**27/35 match Rob's shipped calendars 91–100%**; **8 flagged** (SOYMEAL/SOYOIL non-monotonic;
+GAS_US_mini thin-break; RICE/KOSPI_mini/LEANHOG/LIVECOW seasonal divergence; GOLD_micro 80%) —
+see notes/concepts/roll_cycles_and_liquid_contracts.md §5.5. UA shopping list for Batch 1:
+`private/csi_batch1_shopping_list.txt`.
+Prior milestone (07-01): pipeline validated end-to-end (see csi_setup_guide.md).
 
 Also today: instrument-universe framework (notes/concepts/instrument_universe.md — research 501
 vs live tradeable, self-scaling, exclude_instrument_lists); **IB tradeability probe**
@@ -26,14 +31,17 @@ vs live tradeable, self-scaling, exclude_instrument_lists); **IB tradeability pr
   contract-volume `v`, specs file ON, all continuation/adjust features OFF — PST does its own).
 
 **NEXT STEPS (in order):**
-1. Build the FULL portfolio in UA (research universe ~501) → export all contracts + a
-   `symbol.specs.txt` per market to Z:\.
-2. `uv run python -m sysinit.futures.build_csi_symbol_map --specs <dir>` → review audit CSV,
-   resolve MEDIUM/LOW, pin fixes in KNOWN_OVERRIDES → trusted CSI_SYMBOL_MAP.
-3. Wire `csi_pipeline --rename` to LOAD the map CSV (replace the 2-entry inline seed).
-4. Nightly cron: UA scheduled export (auto-login) → `--rename` → process.
-5. Seasonal deep-backfill (CORN/WHEAT/CRUDE_W/SOYBEAN) → fixes barchart build-out roll failures.
-6. Dup-date check on CSI+barchart/IB tail-merge (saw 23:00 vs 00:00 mix). QA audit = task #25.
+1. FIX the 8 roll-flagged Batch-1 instruments (per-instrument, NOT batched — Rob's rule):
+   SOYMEAL/SOYOIL non-monotonic (rebuild/hand-edit CSV); GAS_US_mini thin (add main-size GAS_US);
+   RICE/KOSPI_mini/LEANHOG/LIVECOW seasonal held-month review (AFTS Part Six input helps);
+   re-run `validate_roll_calendars` after.
+2. First-notice/delivery-timing audit for physically-settled names (§5.3 checklist).
+3. Expand to Batch 2 → full research universe (~501) in UA; same flow:
+   build_csi_symbol_map --specs (auto-HIGH + pin residue in KNOWN_OVERRIDES) → --rename → --instruments all → validate.
+4. Nightly cron: UA scheduled export (auto-login) → `--rename` → process → validate.
+5. Dup-date check on CSI+barchart/IB tail-merge (saw 23:00 vs 00:00 mix).
+6. Pipeline flow now = 3 cmds (map build → --rename loads csi_symbol_map.csv → --instruments all).
+QA audit = task #25 (roll process circumvention now partially discharged via validate_roll_calendars).
 
 ---
 
