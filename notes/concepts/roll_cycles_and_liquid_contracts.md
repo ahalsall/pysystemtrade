@@ -381,6 +381,17 @@ contract Rob does. Run: `uv run python -m sysinit.futures.validate_roll_calendar
   seasonal delivery-month discussion would confirm intent). `GOLD_micro` 80% borderline.
 - The 91–100% matches are strong validation that the generator + `rollconfig` params are correct.
 
+**Follow-up (2026-07-02): SOYMEAL/SOYOIL monotonicity FIXED** via a duplicate-date dedupe now in
+`run_pipeline` (`_dedupe_roll_calendar_csv`, keep-last; self-heals at scale). They then joined the
+seasonal-divergence bucket. **Characterized that divergence:** for RICE/LEANHOG/SOYMEAL our held
+**months exactly equal Rob's** (HoldRollCycle correct) and the **nearer-month data is dense**
+(RICE contracts 136–224 rows each — NOT the sparse trap). So the ~30% is a genuine **roll-timing
+phase offset**: our fresh calendar (current `rollconfig`, e.g. RICE `RollOffsetDays=-90`) holds
+~1 cycle-step **further out** than Rob's *shipped* calendar (we hold Jul when he holds May; LEANHOG
+1–3 steps). His shipped calendars may be older/hand-tuned vs the current config. **Resolution needs
+AFTS Part Six** (intended seasonal held maturity) — decide whether to accept ("no one true set of
+stitching dates") or adjust; NOT a data bug. GAS_US_mini still needs main-size `GAS_US` exported.
+
 **General rule confirmed:** research/backtest deep history should come from the **most-liquid
 (usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
 underlying → identical Panama price series, only the multiplier (in config) differs.
