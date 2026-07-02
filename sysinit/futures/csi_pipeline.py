@@ -21,6 +21,7 @@ Usage:
   uv run python -m sysinit.futures.csi_pipeline --instruments AEX,ALUMINUM
 """
 import argparse
+import csv
 import os
 import re
 
@@ -58,6 +59,8 @@ CSI_HEADER = "Time,Open,High,Low,Close,Volume\n"
 DEFAULT_EXPORT_DIR = "private.data.futures.csi"
 DEFAULT_DATAPATH = "private.data.futures.csi_ingest"
 DEFAULT_ROLL_CALENDAR_PATH = "private.data.futures.roll_calendars_csv"
+# built by sysinit.futures.build_csi_symbol_map (csi_symbol,pst_code,...)
+DEFAULT_MAP_FILE = "private/data/futures/csi_symbol_map.csv"
 
 # CSI symbol -> PST instrument code. SEED — extend to the full universe from CSI's
 # symbol list (Unfair Advantage market list). Same code style as the legacy
@@ -73,14 +76,46 @@ _CSI_RE = re.compile(r"^([A-Z0-9]+)_(\d{6})\.csv$")
 # %Y-%m-%dT%H:%M:%S and the barchart data. A tz-aware index breaks PST's daily
 # conversion downstream (same lesson as the barchart %z gotcha).
 _TZ_OFFSET_RE = re.compile(r"(\dT\d{2}:\d{2}:\d{2})[+-]\d{4}")
+# staged file: Day_<PST>_<YYYYMM00>.csv  (PST codes may contain underscores)
+_STAGED_RE = re.compile(r"^Day_(.+)_\d{8}\.csv$")
 
 
-def rename_csi_exports(export_dir: str, target_datapath: str):
+def load_symbol_map(map_file: str = DEFAULT_MAP_FILE) -> dict:
+    """Merge the builder's csi_symbol_map.csv (csi_symbol,pst_code,...) over the
+    inline seed; CSV wins. Falls back to just the seed if the file is absent."""
+    merged = dict(CSI_SYMBOL_MAP)
+    if map_file and os.path.exists(map_file):
+        with open(map_file) as f:
+            for r in csv.DictReader(f):
+                sym = (r.get("csi_symbol") or "").strip()
+                pst = (r.get("pst_code") or "").strip()
+                if sym and pst:
+                    merged[sym] = pst
+        print(f"symbol map: {len(merged)} entries (seed + {map_file})")
+    else:
+        print(f"symbol map: file not found ({map_file}); using inline seed ({len(merged)})")
+    return merged
+
+
+def instruments_in_datapath(datapath: str) -> list:
+    """Distinct PST codes among staged Day_<PST>_<YYYYMM00>.csv files."""
+    d = get_resolved_pathname(datapath)
+    codes = set()
+    for fn in os.listdir(d):
+        m = _STAGED_RE.match(fn)
+        if m:
+            codes.add(m.group(1))
+    return sorted(codes)
+
+
+def rename_csi_exports(export_dir: str, target_datapath: str, symbol_map: dict = None):
     """Stage raw CSI `<SYM>_<YYYYMM>.csv` (headerless, date-only) found anywhere
     under export_dir into datapath as `Day_<PST>_<YYYYMM00>.csv`, prepending the
     column header and stripping any tz offset. Walks subdirectories because UA
     writes into nested folders (e.g. UA/Data/PST/). `.Specs.txt` files are ignored
     (they don't match the contract-file pattern)."""
+    if symbol_map is None:
+        symbol_map = CSI_SYMBOL_MAP
     src = get_resolved_pathname(export_dir)
     dst = get_resolved_pathname(target_datapath)
     os.makedirs(dst, exist_ok=True)
@@ -93,7 +128,7 @@ def rename_csi_exports(export_dir: str, target_datapath: str):
             if not m:
                 continue
             sym, yyyymm = m.group(1), m.group(2)
-            pst = CSI_SYMBOL_MAP.get(sym)
+            pst = symbol_map.get(sym)
             if pst is None:
                 skipped.append(sym)
                 continue
@@ -136,18 +171,26 @@ def main():
     p = argparse.ArgumentParser(description="CSI ingestion pipeline")
     p.add_argument("--export-dir", help="raw CSI export dir (with <SYM>_<YYYYMM>.csv)")
     p.add_argument("--rename", action="store_true", help="rename CSI exports into datapath")
-    p.add_argument("--instruments", help="comma-separated PST codes to process")
+    p.add_argument("--instruments", help="comma-separated PST codes, or 'all' to "
+                   "process every instrument staged in the datapath")
     p.add_argument("--datapath", default=DEFAULT_DATAPATH)
     p.add_argument("--roll-calendar-path", default=DEFAULT_ROLL_CALENDAR_PATH)
+    p.add_argument("--map-file", default=DEFAULT_MAP_FILE,
+                   help="CSI->PST map CSV from build_csi_symbol_map (merged over seed)")
     args = p.parse_args()
 
     if args.rename:
         if not args.export_dir:
             p.error("--rename requires --export-dir")
-        rename_csi_exports(args.export_dir, args.datapath)
+        symbol_map = load_symbol_map(args.map_file)
+        rename_csi_exports(args.export_dir, args.datapath, symbol_map)
 
     if args.instruments:
-        instruments = [c.strip() for c in args.instruments.split(",") if c.strip()]
+        if args.instruments.strip().lower() == "all":
+            instruments = instruments_in_datapath(args.datapath)
+            print(f"processing all {len(instruments)} staged instruments")
+        else:
+            instruments = [c.strip() for c in args.instruments.split(",") if c.strip()]
         run_pipeline(instruments, args.datapath, args.roll_calendar_path)
 
 
