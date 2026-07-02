@@ -38,10 +38,28 @@ from difflib import SequenceMatcher
 IB_CONFIG = "sysbrokers/IB/config/ib_config_futures.csv"
 INSTR_CONFIG = "data/futures/csvconfig/instrumentconfig.csv"
 
-# seed / known-good overrides — always win, and let us encode manual audit results
+# known-good overrides — always win; encode human-verified audit results here.
+# Batch 1 (2026-07-02): all 35 verified against PST descriptions.
 KNOWN_OVERRIDES = {
-    "AE": "AEX",
-    "AL": "ALUMINIUM",
+    # metals / crypto / energy
+    "ALI": "ALUMINIUM", "MGC": "GOLD_micro", "MHG": "COPPER-micro",
+    "MBT": "BITCOIN", "QG": "GAS_US_mini",
+    # ags
+    "RR2": "RICE", "W2": "WHEAT", "SM2": "SOYMEAL", "BO2": "SOYOIL",
+    "LH": "LEANHOG", "LC": "LIVECOW",
+    # bonds
+    "TY": "US10", "FOA": "OAT",              # US10 not US10U(Ultra); OAT not OAT5(5yr)
+    # equity indices
+    "AEX": "AEX", "SXE": "EUROSTX",          # EUROSTX50 not EU-DIV30
+    "SMI": "SMI", "MYM": "DOW", "MNQ": "NASDAQ_micro",
+    "A50": "FTSECHINAA", "KQI": "KOSDAQ", "KOM": "KOSPI_mini",  # KOSPI200 mini not KOSPI300
+    "MEA": "MSCIASIA", "JMO": "MUMMY",       # TSE Growth Market 250 = renamed Mothers
+    "SEF": "IRON",
+    # euro sector indices (Euro STOXX family, not the STOXX 600 variants)
+    "DEB": "EU-BANKS", "DEW": "EU-DJ-UTIL", "DJA": "EU-AUTO", "DEE": "EU-DJ-OIL",
+    # FX
+    "RA": "ZAR", "CD": "CAD", "RY": "YENEUR", "MP": "MXP", "SEK": "SEK",
+    "M6E": "EUR_micro", "KRW": "USDKRW",     # KRX USD/KRW (distinct from SGX KRWUSD_mini)
 }
 
 
