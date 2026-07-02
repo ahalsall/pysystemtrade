@@ -1,8 +1,39 @@
 # SESSION HANDOFF — pysystemtrade Barchart pipeline & AFTS strategy work
 
 **Purpose:** durable backup so this work can be fully resumed from a fresh session.
-**Last updated:** 2026-06-29 (work by Andrew Halsall + Claude).
+**Last updated:** 2026-07-01 (work by Andrew Halsall + Claude).
 **Repo:** /home/andrew/pysystemtrade · branch `develop` · fork `ahalsall/pysystemtrade` (origin), upstream `robcarver17/pysystemtrade`.
+
+---
+
+## ⏱ RESUME HERE (2026-07-01 evening)
+**CSI deep-history pipeline is VALIDATED END-TO-END.** Today: built a KVM/Windows-11 VM
+running Unfair Advantage, Samba share (Z: → csi landing dir), and ran the first real export
+all the way to the DB — **AEX 30yr (1996→2026, 7946 adj prices) + ALUMINIUM 7yr**, with
+correct PRICE/FORWARD/CARRY. See notes/concepts/csi_setup_guide.md ("Validated END-TO-END").
+
+Also today: instrument-universe framework (notes/concepts/instrument_universe.md — research 501
+vs live tradeable, self-scaling, exclude_instrument_lists); **IB tradeability probe**
+(`ib_tradeability_probe.py`) run → 483 tradeable / 101 untradeable → `private/trading_restrictions.yaml`;
+**CSI→PST symbol-map builder** (`build_csi_symbol_map.py`) finalized against real `.Specs.txt`.
+
+**Key facts for resuming CSI work:**
+- Real UA export = headerless, date-only (`2023-10-23,719.30,...`), nested under `UA/Data/PST/`,
+  CSI symbols like `AEX`/`ALI` (NOT AE/AL). `csi_pipeline` handles it (date fmt `%Y-%m-%d`,
+  `--rename` walks subdirs + prepends header). Windows needs `EnableLinkedConnections=1` so
+  admin-UA sees mapped Z:.
+- UA export settings are in notes/concepts/csi_export_design.md (individual contracts, DOHLCV +
+  contract-volume `v`, specs file ON, all continuation/adjust features OFF — PST does its own).
+
+**NEXT STEPS (in order):**
+1. Build the FULL portfolio in UA (research universe ~501) → export all contracts + a
+   `symbol.specs.txt` per market to Z:\.
+2. `uv run python -m sysinit.futures.build_csi_symbol_map --specs <dir>` → review audit CSV,
+   resolve MEDIUM/LOW, pin fixes in KNOWN_OVERRIDES → trusted CSI_SYMBOL_MAP.
+3. Wire `csi_pipeline --rename` to LOAD the map CSV (replace the 2-entry inline seed).
+4. Nightly cron: UA scheduled export (auto-login) → `--rename` → process.
+5. Seasonal deep-backfill (CORN/WHEAT/CRUDE_W/SOYBEAN) → fixes barchart build-out roll failures.
+6. Dup-date check on CSI+barchart/IB tail-merge (saw 23:00 vs 00:00 mix). QA audit = task #25.
 
 ---
 
