@@ -135,6 +135,22 @@ def score_match(csi: dict, pst: dict) -> tuple:
         score += 2
         ev["exch"] = csi.get("exchange")
 
+    # category / asset-class match (+3 / -3) — strong disambiguator (a grain is
+    # not a bond); stops coincidental point-value collisions across asset classes.
+    cat = (csi.get("category", "") or "").lower()
+    pac = pst.get("asset_class", "")
+    csi_acs = set()
+    for kw, acs in CATEGORY_KEYWORDS:
+        if kw in cat:
+            csi_acs |= acs
+    if csi_acs and pac:
+        if pac in csi_acs:
+            score += 3
+            ev["asset"] = pac
+        else:
+            score -= 3
+            ev["asset_mismatch"] = f"{cat}!~{pac}"
+
     # point value match (+3) — real multiplier lives in Contract Size
     # ('EUR 200 X INDEX', '25 TONNES'); fall back to point_value.
     pv = _first_num(csi.get("contract_size")) or _first_num(csi.get("point_value"))
@@ -148,10 +164,11 @@ def score_match(csi: dict, pst: dict) -> tuple:
 
 
 def confidence(best_score, runner_score, ev) -> str:
-    strong = ("exch_sym" in ev) + (("ccy" in ev) and ("pointvalue" in ev))
+    strong = (("exch_sym" in ev) + (("ccy" in ev) and ("pointvalue" in ev))
+              + ("asset" in ev))
     name_ok = "name" in ev and float(ev["name"].split("/")[0]) >= 0.6
     margin = best_score - runner_score
-    if "ccy_mismatch" in ev:
+    if "ccy_mismatch" in ev or "asset_mismatch" in ev:
         return "LOW"
     if best_score >= 6 and margin >= 1.5 and (strong or name_ok):
         return "HIGH"
@@ -200,7 +217,28 @@ _SPEC_KEYS = {
     "currency": ["currency", "ccy", "denomination"],
     "point_value": ["big point value", "point value", "contract value", "pointvalue"],
     "contract_size": ["contract size", "contractsize"],
+    "category": ["category", "sector"],
 }
+
+# CSI Category keyword -> set of acceptable PST AssetClass values. Strong
+# disambiguator (a grain can't be a bond). Order-independent; sets are unioned
+# over all matching keywords.
+CATEGORY_KEYWORDS = [
+    ("forex", {"FX"}), ("currenc", {"FX"}),
+    ("metal", {"Metals"}),
+    ("grain", {"Ags"}), ("oilseed", {"Ags"}), ("livestock", {"Ags"}),
+    ("meat", {"Ags"}), ("soft", {"Ags"}), ("food", {"Ags"}), ("agri", {"Ags"}),
+    ("energy", {"OilGas"}), ("petroleum", {"OilGas"}), ("crude", {"OilGas"}),
+    ("gas", {"OilGas"}),
+    ("crypto", {"Metals", "Other"}), ("bitcoin", {"Metals", "Other"}),
+    ("govt", {"Bond", "STIR"}), ("note", {"Bond"}), ("bond", {"Bond"}),
+    ("interest", {"Bond", "STIR"}), ("rate", {"Bond", "STIR"}),
+    ("financial", {"Bond", "STIR"}), ("treasur", {"Bond"}),
+    ("index", {"Equity", "Sector"}), ("stock", {"Equity", "SingleStock", "Sector"}),
+    ("equit", {"Equity", "Sector"}),
+    ("housing", {"Housing"}), ("realestate", {"Housing"}),
+    ("volatil", {"Vol"}),
+]
 
 
 def _derive_exchange_symbol(rec: dict):
