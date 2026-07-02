@@ -108,6 +108,24 @@ def instruments_in_datapath(datapath: str) -> list:
     return sorted(codes)
 
 
+def _dedupe_roll_calendar_csv(code: str, roll_calendar_path: str):
+    """Drop degenerate duplicate-date roll rows (keep LAST, preserving the forward
+    chain) so the calendar is strictly monotonic. These appear when the earliest
+    held contract is clamped to the start, giving two rolls on the same first date."""
+    import pandas as pd
+    path = os.path.join(get_resolved_pathname(roll_calendar_path), f"{code}.csv")
+    if not os.path.exists(path):
+        return
+    df = pd.read_csv(path)
+    datecol = df.columns[0]
+    before = len(df)
+    df = df.drop_duplicates(subset=datecol, keep="last")
+    if len(df) < before:
+        df.to_csv(path, index=False)
+        print(f"  [{code}] deduped roll calendar: {before} -> {len(df)} rows "
+              f"(removed {before - len(df)} duplicate-date rows)")
+
+
 def rename_csi_exports(export_dir: str, target_datapath: str, symbol_map: dict = None):
     """Stage raw CSI `<SYM>_<YYYYMM>.csv` (headerless, date-only) found anywhere
     under export_dir into datapath as `Day_<PST>_<YYYYMM00>.csv`, prepending the
@@ -154,6 +172,7 @@ def run_pipeline(instruments, datapath, roll_calendar_path):
             init_db_with_split_freq_csv_prices_for_code(code, datapath, csv_config=CSI_CONFIG)
             build_and_write_roll_calendar(code, output_datapath=roll_calendar_path,
                                           write=True, check_before_writing=False)
+            _dedupe_roll_calendar_csv(code, roll_calendar_path)
             process_multiple_prices_single_instrument(
                 code, csv_roll_data_path=roll_calendar_path, ADD_TO_DB=True, ADD_TO_CSV=False)
             process_adjusted_prices_single_instrument(code, ADD_TO_DB=True, ADD_TO_CSV=False)
