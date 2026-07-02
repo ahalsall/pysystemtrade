@@ -42,11 +42,15 @@ CSI_CONFIG = ConfigCsvFuturesPrices(
     input_date_index_name="Time",
     input_skiprows=0,
     input_skipfooter=0,
-    input_date_format="%Y-%m-%dT%H:%M:%S",
+    input_date_format="%Y-%m-%d",
     input_column_mapping=dict(
         OPEN="Open", HIGH="High", LOW="Low", FINAL="Close", VOLUME="Volume"
     ),
 )
+
+# UA's real export is HEADERLESS and date-only: `2023-10-23,719.30,...,2`.
+# --rename prepends this header so CSI_CONFIG (name-based mapping) can parse it.
+CSI_HEADER = "Time,Open,High,Low,Close,Volume\n"
 
 # Raw CSI exports land in private/data/futures/csi/ (owned by the dedicated `csi`
 # user that runs Unfair Advantage — read-only for us). We stage renamed files in an
@@ -59,8 +63,8 @@ DEFAULT_ROLL_CALENDAR_PATH = "private.data.futures.roll_calendars_csv"
 # symbol list (Unfair Advantage market list). Same code style as the legacy
 # barchart market_map (sysinit/futures/barchart_futures_contract_prices.py).
 CSI_SYMBOL_MAP = {
-    "AE": "AEX",
-    "AL": "ALUMINIUM",  # PST spelling is British (ALUMINIUM), CSI file used ALUMINUM
+    "AEX": "AEX",        # CSI AEX (Euronext AEX Index, EUR x200) -> PST AEX
+    "ALI": "ALUMINIUM",  # CSI ALI (COMEX Aluminum, USD 25t) -> PST ALUMINIUM (IB sym ALI/COMEX)
 }
 
 _CSI_RE = re.compile(r"^([A-Z0-9]+)_(\d{6})\.csv$")
@@ -72,27 +76,36 @@ _TZ_OFFSET_RE = re.compile(r"(\dT\d{2}:\d{2}:\d{2})[+-]\d{4}")
 
 
 def rename_csi_exports(export_dir: str, target_datapath: str):
-    """Rename raw CSI `<SYM>_<YYYYMM>.csv` -> `Day_<PST>_<YYYYMM00>.csv` in datapath."""
+    """Stage raw CSI `<SYM>_<YYYYMM>.csv` (headerless, date-only) found anywhere
+    under export_dir into datapath as `Day_<PST>_<YYYYMM00>.csv`, prepending the
+    column header and stripping any tz offset. Walks subdirectories because UA
+    writes into nested folders (e.g. UA/Data/PST/). `.Specs.txt` files are ignored
+    (they don't match the contract-file pattern)."""
     src = get_resolved_pathname(export_dir)
     dst = get_resolved_pathname(target_datapath)
     os.makedirs(dst, exist_ok=True)
     renamed, skipped = 0, []
-    for fn in os.listdir(src):
-        m = _CSI_RE.match(fn)
-        if not m:
-            continue
-        sym, yyyymm = m.group(1), m.group(2)
-        pst = CSI_SYMBOL_MAP.get(sym)
-        if pst is None:
-            skipped.append(sym)
-            continue
-        out = f"Day_{pst}_{yyyymm}00.csv"
-        with open(os.path.join(src, fn)) as f_in:
-            content = f_in.read()
-        content = _TZ_OFFSET_RE.sub(r"\1", content)  # tz-aware -> tz-naive
-        with open(os.path.join(dst, out), "w") as f_out:
-            f_out.write(content)
-        renamed += 1
+    for root, _dirs, files in os.walk(src):
+        if os.path.abspath(root) == os.path.abspath(dst):
+            continue  # never re-ingest our own staged output
+        for fn in files:
+            m = _CSI_RE.match(fn)
+            if not m:
+                continue
+            sym, yyyymm = m.group(1), m.group(2)
+            pst = CSI_SYMBOL_MAP.get(sym)
+            if pst is None:
+                skipped.append(sym)
+                continue
+            out = f"Day_{pst}_{yyyymm}00.csv"
+            with open(os.path.join(root, fn)) as f_in:
+                content = f_in.read()
+            content = _TZ_OFFSET_RE.sub(r"\1", content)  # tz-aware -> tz-naive (no-op if date-only)
+            if not content.lstrip().lower().startswith("time,"):
+                content = CSI_HEADER + content  # UA exports are headerless
+            with open(os.path.join(dst, out), "w") as f_out:
+                f_out.write(content)
+            renamed += 1
     print(f"renamed {renamed} CSI files into {dst}")
     if skipped:
         print(f"  no CSI_SYMBOL_MAP entry for (skipped): {sorted(set(skipped))}")
