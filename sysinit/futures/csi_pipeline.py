@@ -64,6 +64,11 @@ CSI_SYMBOL_MAP = {
 }
 
 _CSI_RE = re.compile(r"^([A-Z0-9]+)_(\d{6})\.csv$")
+# UA writes ISO timestamps with a timezone offset (e.g. 2024-08-19T05:00:00+0000).
+# Strip the offset so timestamps are tz-naive: matches CSI_CONFIG's
+# %Y-%m-%dT%H:%M:%S and the barchart data. A tz-aware index breaks PST's daily
+# conversion downstream (same lesson as the barchart %z gotcha).
+_TZ_OFFSET_RE = re.compile(r"(\dT\d{2}:\d{2}:\d{2})[+-]\d{4}")
 
 
 def rename_csi_exports(export_dir: str, target_datapath: str):
@@ -82,8 +87,11 @@ def rename_csi_exports(export_dir: str, target_datapath: str):
             skipped.append(sym)
             continue
         out = f"Day_{pst}_{yyyymm}00.csv"
-        with open(os.path.join(src, fn)) as f_in, open(os.path.join(dst, out), "w") as f_out:
-            f_out.write(f_in.read())
+        with open(os.path.join(src, fn)) as f_in:
+            content = f_in.read()
+        content = _TZ_OFFSET_RE.sub(r"\1", content)  # tz-aware -> tz-naive
+        with open(os.path.join(dst, out), "w") as f_out:
+            f_out.write(content)
         renamed += 1
     print(f"renamed {renamed} CSI files into {dst}")
     if skipped:
