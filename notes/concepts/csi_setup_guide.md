@@ -77,12 +77,31 @@ uv run python -m sysinit.futures.csi_pipeline --instruments AEX,ALUMINIUM,...
 - processing reuses the split-freq loader (CSI_CONFIG: FINAL="Close") + roll/multiple/adjusted stages.
 - Later: a nightly cron mirroring the barchart build-out (respecting the `barchart_process_exclude` separation so pipelines don't collide).
 
-## Validated (2026-07-01)
-Rename + CSI_CONFIG parse verified on sample data: `AE_202411.csv`→`Day_AEX_20241100.csv`, AEX Dec-2024 contract parsed 259 daily rows back to 2023-12. Ingestion path works; CSI's real depth is decades.
+## Validated END-TO-END (2026-07-01) — real UA export
+Full chain proven on the first real UA export (AEX + ALI):
+UA ASCII export → Samba (Z: → csi landing dir) → `--rename` → per-contract parquet →
+roll calendar → multiple prices → **Panama-adjusted deep history in the DB**.
+- **AEX**: 7,946 adjusted prices, **1996→2026 (30 years)**; multiple prices with correct
+  PRICE/FORWARD/CARRY chains. **ALUMINIUM** (COMEX, CSI sym ALI): 3,185, 2019→2026.
+- Real UA format learned: **headerless, date-only** (`2023-10-23,719.30,...`), nested under
+  `UA/Data/PST/`, CSI symbols `AEX`/`ALI` (NOT the stale AE/AL seed). `csi_pipeline`
+  adapted: date fmt `%Y-%m-%d`, `--rename` walks subdirs + prepends the header.
+- Symbol-map builder (`build_csi_symbol_map.py`) finalized against the real `.Specs.txt`
+  (key:value; multiplier from Contract Size; exchange-symbol from Market tail; exchange
+  tie-break). AEX→AEX and ALI→ALUMINIUM both auto-resolve HIGH.
+
+### UA export settings used (reproduce for the full run) — see csi_export_design.md
+Individual contracts · DOHLCV w/ contract-volume `v` · date `YYYY-MM-DD` · no header in
+UA (we prepend) · specs file ON · Windows: EnableLinkedConnections=1 so UA (admin) sees Z:.
 
 ## TODO to go live with CSI
-1. Build the full **CSI_SYMBOL_MAP** (CSI symbol → exact PST code) for our universe — from CSI/UA's symbol list; verify spellings (e.g. ALUMINIUM not ALUMINUM).
-2. Confirm UA's actual export **header/date format** and reconcile with CSI_CONFIG.
-3. Decide the shared-folder mechanism (Samba recommended) + auto-export schedule.
-4. Backfill deep history for the seasonals (CORN/WHEAT/CRUDE_W/SOYBEAN) → fixes the roll-calendar sparse-data problem so they trade correctly.
-5. Verify first-notice/delivery handling once deep data enables proper roll calendars.
+1. [DONE] ~~header/date format~~ — headerless date-only; csi_pipeline adapted.
+2. [DONE] ~~shared folder~~ — Samba + EnableLinkedConnections; validated end-to-end.
+3. Build the full portfolio in UA (research universe ~501) + export all + `symbol.specs.txt`
+   for each → run `build_csi_symbol_map --specs <dir>` → audit → trusted CSI_SYMBOL_MAP.
+4. Wire `csi_pipeline --rename` to LOAD the map from the builder's CSV (replace inline seed).
+5. Nightly cron: UA scheduled export (auto-login) → `csi_pipeline --rename` + process.
+6. Backfill deep history for the seasonals (CORN/WHEAT/CRUDE_W/SOYBEAN) → fixes the
+   roll-calendar sparse-data problem (the barchart build-out's dominant failure).
+7. Confirm CSI+barchart/IB tail-merge has no duplicate dates (saw a 23:00 vs 00:00 mix).
+8. Verify first-notice/delivery handling once deep data enables proper roll calendars.
