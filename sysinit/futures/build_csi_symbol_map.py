@@ -83,6 +83,16 @@ def _num(x):
         return None
 
 
+def _first_num(x):
+    """First number in a string, e.g. 'EUR 200 X INDEX' -> 200, '25 TONNES' -> 25."""
+    if x is None:
+        return None
+    m = re.search(r"[-+]?\d[\d,]*\.?\d*", str(x))
+    if not m:
+        return None
+    return _num(m.group(0))
+
+
 def score_match(csi: dict, pst: dict) -> tuple:
     """Return (score, evidence dict). Higher = better. Requires corroboration
     for a confident match (see confidence() )."""
@@ -118,8 +128,16 @@ def score_match(csi: dict, pst: dict) -> tuple:
             score -= 1.5  # currency mismatch is a strong negative
             ev["ccy_mismatch"] = f"{cur}!={pcur}"
 
-    # point value match (+3)
-    pv = _num(csi.get("point_value"))
+    # exchange match (+2) — breaks ties like COMEX vs LME aluminum
+    ex = _norm(csi.get("exchange", ""))
+    pex = _norm(pst.get("ib_exchange", ""))
+    if ex and pex and (ex == pex or ex in pex or pex in ex):
+        score += 2
+        ev["exch"] = csi.get("exchange")
+
+    # point value match (+3) — real multiplier lives in Contract Size
+    # ('EUR 200 X INDEX', '25 TONNES'); fall back to point_value.
+    pv = _first_num(csi.get("contract_size")) or _first_num(csi.get("point_value"))
     ppv = _num(pst.get("pointsize")) or _num(pst.get("ib_multiplier"))
     if pv is not None and ppv is not None and pv > 0 and ppv > 0:
         if abs(pv - ppv) / max(pv, ppv) < 0.001:
@@ -181,7 +199,21 @@ _SPEC_KEYS = {
     "exchange_symbol": ["exchange symbol", "exchangesymbol", "trading symbol"],
     "currency": ["currency", "ccy", "denomination"],
     "point_value": ["big point value", "point value", "contract value", "pointvalue"],
+    "contract_size": ["contract size", "contractsize"],
 }
+
+
+def _derive_exchange_symbol(rec: dict):
+    """UA specs embed the exchange ticker in the Market name, e.g.
+    'AEX Index-EOE' -> EOE. Extract a trailing ALL-CAPS 2-5 char token if the
+    exchange_symbol field wasn't provided directly."""
+    if rec.get("exchange_symbol") or not rec.get("name"):
+        return
+    tail = rec["name"].rsplit("-", 1)
+    if len(tail) == 2:
+        cand = tail[1].strip()
+        if re.fullmatch(r"[A-Z0-9]{2,5}", cand):
+            rec["exchange_symbol"] = cand
 
 
 def _normkey(s: str) -> str:
@@ -215,22 +247,22 @@ def load_csi_specs(path: str) -> list:
                 # normalized CSV
                 for r in csv.DictReader(f):
                     low = {_normkey(k): (v or "").strip() for k, v in r.items()}
-                    records.append({
-                        field: _spec_field(variants, low)
-                        for field, variants in _SPEC_KEYS.items()
-                    })
+                    rec = {field: _spec_field(variants, low)
+                           for field, variants in _SPEC_KEYS.items()}
+                    _derive_exchange_symbol(rec)
+                    records.append(rec)
             else:
-                # key:value block(s)
+                # key:value block(s) — one .Specs.txt file per market
                 kv = {}
                 for line in f:
                     m = re.match(r"\s*([A-Za-z][A-Za-z ./]+?)\s*[:=]\s*(.+)", line)
                     if m:
                         kv[_normkey(m.group(1))] = m.group(2).strip()
                 if kv:
-                    records.append({
-                        field: _spec_field(variants, kv)
-                        for field, variants in _SPEC_KEYS.items()
-                    })
+                    rec = {field: _spec_field(variants, kv)
+                           for field, variants in _SPEC_KEYS.items()}
+                    _derive_exchange_symbol(rec)
+                    records.append(rec)
     return [r for r in records if r.get("csi_symbol")]
 
 
