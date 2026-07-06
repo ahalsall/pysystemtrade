@@ -453,6 +453,15 @@ forward-ness (shorten `RollOffsetDays -90` and/or hand-edit toward the liquid co
 GOLD_micro: rank metric unreliable for many-contract instruments; check absolute volume of the held
 contract before concluding. Net: the seasonal roll-timing question is largely CLOSED (task #25 rolls).
 
+**SOYMEAL FIXED (2026-07-06):** `RollOffsetDays -90 → -45`. In-process offset sweep (regenerate
+calendar per offset, re-score liquidity) found -45 the sweet spot. Result: held-contract liquidity
+**47% → 79%** of max-vol (rank ~3 → 2.1), vs-Rob **30% → 67%**, full 1996-2026 intact, monotonic+valid,
+first-notice-safe (physically settled: expiry ~15th, roll 45d before ≈ 30d before first notice). Now
+in the ACCEPT bucket with the others. Method (offset-sweep + liquidity score) is reusable for any
+too-far-forward instrument. Remaining seasonal follow-ups: KOSPI_mini/GOLD_micro absolute-volume look;
+**SOYOIL** is also -90 (currently 65%, acceptable) and a candidate for the same -45 treatment for
+bean-complex consistency.
+
 **General rule confirmed:** research/backtest deep history should come from the **most-liquid
 (usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
 underlying → identical Panama price series, only the multiplier (in config) differs.
