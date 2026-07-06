@@ -74,6 +74,11 @@ User context: Andrew (andrew.halsall@gmail.com), trading from **Canada**, initia
 - **Config:** `private/private_config.yaml` (GITIGNORED — holds Barchart credentials + parquet/mongo/barchart_* keys). NOT in git.
 - **SSH/git auth:** generated `~/.ssh/id_ed25519`, added to GitHub; `origin` is SSH (`git@github.com:ahalsall/pysystemtrade.git`); github.com in known_hosts. Pushes work without prompts.
 - **Spot FX:** 12 provided FX series loaded into parquet (backtest prerequisite for non-USD instruments).
+- **Scheduling (2026-07-06):** Barchart build-out moved from `cron` → **systemd USER timer**
+  `barchart-buildout.timer` (OnCalendar 08:00, `Persistent=true` → catches up after overnight suspend;
+  plain cron silently missed 07-03..07-06 on this mobile laptop). Units in `~/.config/systemd/user/`
+  (`barchart-buildout.{service,timer}`). The future CSI nightly ingest should use the same pattern.
+  Optional hardening: `sudo loginctl enable-linger andrew` (boot-before-login). Production → always-on box.
 
 ### Workflow rule (IMPORTANT)
 - This environment has **NO TTY**: interactive scripts (`input()`), `sudo`, and git credential prompts will hang/fail. Run interactive / long-running / live-data / real-DB-writing work in Andrew's OWN terminal.

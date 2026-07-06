@@ -423,6 +423,22 @@ GENERAL PATTERN to watch at scale: an instrument whose rollconfig cycle doesn't 
 actually trade in the data source silently truncates — the `validate_roll_calendars` truncation check
 (compare calendar end to DATA end) catches it.
 
+**RECONCILIATION CRITERION for the 7 seasonal divergences (from Rob's roll-calendar blog posts,
+read 2026-07-06):** Rob states **"There is no one true set of stitching dates"** — his *shipped*
+roll calendars are **approximate tools requiring judgment, NOT authoritative**. So matching his
+shipped calendar exactly is the WRONG target, and our ~1-step-offset divergence is **not inherently
+a bug**. The correct test is whether our held contract satisfies his *principles*:
+  1. **Constant maturity** — stick to consistent months (seasonals: one month, roll annually). ✓ we
+     hold the same months as Rob (verified: SOYMEAL/RICE/LEANHOG month-sets identical).
+  2. **Liquid** — "roll before the current contract becomes illiquid / low-vol / rolldown unsuitable"
+     (e.g. crude "at least 45 days before expiry"). ← THE remaining check: confirm our (further-out)
+     held contract has adequate VOLUME, not just data. Dense data ≠ liquid.
+  3. Roll timing per `RollOffsetDays` before expiry / first-notice.
+So the seasonal divergences move from "fix to match Rob" to "verify our held contract is liquid".
+Remaining: a volume check on our held vs front contract for the 7; AFTS Part Six adds strategy-level
+detail but the blog's "no one true stitching" already makes the divergence defensible. Sources:
+qoppac 2015-05 (futures rolling) + 2021-05 (adding new instruments) — both in §6.
+
 **General rule confirmed:** research/backtest deep history should come from the **most-liquid
 (usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
 underlying → identical Panama price series, only the multiplier (in config) differs.
