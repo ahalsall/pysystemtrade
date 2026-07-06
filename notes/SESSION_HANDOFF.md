@@ -10,11 +10,15 @@
 **CSI Batch 1 (35 live-tradeable instruments) INGESTED + roll-VALIDATED.** From the
 Windows/UA VM built 07-01, exported 35 instruments (4,912 contracts) → map-built → deep-history
 adjusted prices in the DB (most 20–30yr; AEX 30yr). Symbol map fully resolved
-(`private/data/futures/csi_symbol_map.csv`, 35 verified). Roll QA pass built + run:
-**27/35 match Rob's shipped calendars 91–100%**; **8 flagged** (SOYMEAL/SOYOIL non-monotonic;
-GAS_US_mini thin-break; RICE/KOSPI_mini/LEANHOG/LIVECOW seasonal divergence; GOLD_micro 80%) —
-see notes/concepts/roll_cycles_and_liquid_contracts.md §5.5. UA shopping list for Batch 1:
-`private/csi_batch1_shopping_list.txt`.
+(`private/data/futures/csi_symbol_map.csv`, 35 verified). Roll QA pass built + run (`validate_roll_calendars.py`: monotonic+valid+truncation, and
+cross-check vs Rob's shipped calendars). **26/36 clean.** FIXED this session:
+SOYMEAL/SOYOIL non-monotonic (dedupe self-heal); **GAS_US** added (NG2→GAS_US, 30yr — deep
+history for thin GAS_US_mini); **USDKRW** quarterly→monthly rollconfig (CSI KRX data is monthly;
+now full 1999-2026). REMAINING flags: **YENEUR** (missing RY Dec-2000 contract → re-export or
+bridge; RY is quarterly-only so monthly trick won't help); **7 seasonal roll-timing divergences**
+(GAS_US/RICE/LEANHOG/LIVECOW/SOYMEAL/SOYOIL/KOSPI_mini/GOLD_micro — correct months+dense data,
+just a phase offset vs Rob → AFTS Part Six review, NOT bugs). See roll_cycles §5.5. UA shopping
+list: `private/csi_batch1_shopping_list.txt`.
 Prior milestone (07-01): pipeline validated end-to-end (see csi_setup_guide.md).
 
 Also today: instrument-universe framework (notes/concepts/instrument_universe.md — research 501
