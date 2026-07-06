@@ -85,6 +85,39 @@ offering / our subscriptions change.
   mismatches, not true untradeables (e.g. BRENT, COTTON, ETHANOL trade under alt codes;
   EDOLLAR is genuinely dead → Eurodollar retired for SOFR). Safe as-is (restrict = don't trade).
 
+## 4. Deduplicating equivalent-exposure instruments (`duplicate_instruments`)
+Separate from the exclusion lists (§3): even among *tradeable, cheap, liquid* instruments,
+several map to the SAME underlying (full/mini/micro of one contract, or the same thing on two
+exchanges — GOLD vs GOLD_micro, GAS_US vs GAS_US_mini, etc.). Trading two of these is not
+diversification — they're ρ≈1.0. Left in, they would **inflate the IDM** (two copies look like
+two independent bets) and let **dynamic opt double the real exposure** to that underlying.
+
+**Mechanism** — `duplicate_instruments` config (include/exclude per "family"):
+```yaml
+duplicate_instruments:
+  include: { gold: GOLD_micro }   # the ONE we trade
+  exclude: { gold: [GOLD] }       # dropped from sim + live optimiser
+```
+Families are human-declared (which codes are the same underlying); the excluded ones are removed
+from the backtest and the optimiser (`sysdata/config/instruments.py` `generate_matching_duplicate_dict`,
+applied in `systems/basesystem.py`) so the correlation matrix / IDM / dyn-opt only ever see ONE bet
+per underlying.
+
+**Which one wins** — `get_best_market` (`sysproduction/reporting/data/duplicate_remove_markets.py`):
+1. HARD FILTERS: `SR_cost ≤ max_cost` AND `volume_contracts > min` AND `volume_risk > min`
+   (cheap enough + liquid on both contract-count and $-risk volume).
+2. Among survivors: **sort by `contract_size` ascending → pick the SMALLEST.** Smallest contract =
+   lowest min-capital + finest sizing granularity. So at CAD 150k, a micro wins IF it clears the
+   liquidity bars; if the micro is too thin ($-risk volume fails), full-size wins. Cost+liquidity
+   gate; capital efficiency breaks the tie.
+
+**For us:** the price SERIES is identical across a family, so **research/backtest sources history
+from the deepest/most-liquid contract** (e.g. GAS_US 30yr) while the **live set trades the
+capital-efficient duplicate** (GAS_US_mini if liquid) — deep data from one, execution on the other.
+Populate the config by running the **duplicate-markets report on OUR data** (CSI/IB cost+liquidity)
+→ it recommends include/exclude per family at our capital. Same "screen on our data, not Rob's"
+principle as §2.
+
 ## Sequencing
 1. CSI-backfill the broad research set (501) → good backtests + fitting.
 2. Build the IB-Canada tradeable probe → set `trading_restrictions` (untradeable complement).
