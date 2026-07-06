@@ -44,6 +44,8 @@ KNOWN_OVERRIDES = {
     # metals / crypto / energy
     "ALI": "ALUMINIUM", "MGC": "GOLD_micro", "MHG": "COPPER-micro",
     "MBT": "BITCOIN", "QG": "GAS_US_mini",
+    "NG2": "GAS_US",     # full-size Henry Hub NG (deep history for thin QG/GAS_US_mini);
+                         # standard NG, not GAS-PEN (penultimate-settlement variant)
     # ags
     "RR2": "RICE", "W2": "WHEAT", "SM2": "SOYMEAL", "BO2": "SOYOIL",
     "LH": "LEANHOG", "LC": "LIVECOW",

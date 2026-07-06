@@ -75,18 +75,18 @@ def validate(codes: list) -> list:
             row["valid"] = "Y" if cal.check_dates_are_valid_for_prices(prices) else "N"
             row["rolls"] = len(cal)
             # truncation check: a single missing mid-chain contract breaks the roll
-            # and silently discards all history after it. Flag when the calendar ends
-            # long before the available contracts do (valid+monotonic won't catch it).
-            contracts = sorted(str(x).split("/")[1][:6]
-                               for x in prices_data.contracts_with_merged_price_data_for_instrument_code(code))
-            if contracts:
-                latest_yr = int(contracts[-1][:4])
+            # and silently discards all history after it (passes monotonic+valid).
+            # Compare the calendar end to the actual DATA end (latest price across all
+            # contracts), NOT the latest contract date -- far-forward-listed contracts
+            # (NG ~8yr, STIR ~10yr) have their data at the present, so using contract
+            # dates false-positives; data end does not.
+            price_dates = [s.index.max() for s in prices.values() if len(s) > 0]
+            if price_dates:
+                data_end_yr = max(price_dates).year
                 cal_end_yr = cal.index.max().year
-                # Healthy instruments list contracts ~1-3yr forward (more for STIR),
-                # so only a LARGE gap signals a real mid-chain break, not forward listing.
-                if latest_yr - cal_end_yr >= 5:
-                    row["note"] = (f"TRUNCATED: rolls end {cal_end_yr}, contracts to "
-                                   f"{latest_yr} (mid-chain gap)")
+                if data_end_yr - cal_end_yr >= 3:
+                    row["note"] = (f"TRUNCATED: rolls end {cal_end_yr}, data to "
+                                   f"{data_end_yr} (mid-chain gap)")
         except Exception as e:
             row["note"] = f"{type(e).__name__}: {str(e)[:50]}"
             results.append(row)
