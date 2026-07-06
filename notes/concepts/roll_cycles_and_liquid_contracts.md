@@ -435,9 +435,23 @@ a bug**. The correct test is whether our held contract satisfies his *principles
      held contract has adequate VOLUME, not just data. Dense data ≠ liquid.
   3. Roll timing per `RollOffsetDays` before expiry / first-notice.
 So the seasonal divergences move from "fix to match Rob" to "verify our held contract is liquid".
-Remaining: a volume check on our held vs front contract for the 7; AFTS Part Six adds strategy-level
-detail but the blog's "no one true stitching" already makes the divergence defensible. Sources:
-qoppac 2015-05 (futures rolling) + 2021-05 (adding new instruments) — both in §6.
+Sources: qoppac 2015-05 (futures rolling) + 2021-05 (adding new instruments) — both in §6.
+
+**LIQUIDITY CHECK RESULTS (2026-07-06):** compared, on sample dates, the VOLUME of our held
+contract vs Rob's held vs the most-liquid contract that day (avg rank + % of day's max volume):
+| instrument | our held (rank / % max-vol) | Rob rank | verdict |
+| RICE       | 1.2 / 95% | 2.2 | ACCEPT — we hold the *most*-liquid |
+| LEANHOG    | 1.7 / 75% | 2.5 | ACCEPT — liquid, beats Rob |
+| SOYOIL     | 2.1 / 65% | 2.7 | ACCEPT — liquid, beats Rob |
+| LIVECOW    | 2.0 / 68% | 3.0 | ACCEPT — liquid, beats Rob |
+| SOYMEAL    | 3.1 / 47% | 1.6 | ADJUST — too-far-forward into thinner contracts |
+| KOSPI_mini | ~38% (rank metric distorted by many contracts) | worse | CLOSER LOOK |
+| GOLD_micro | ~38% (rank metric distorted; 38% of a huge front vol is still liquid abs.) | worse | CLOSER LOOK |
+Conclusion: 4/7 our roll holds a MORE-liquid contract than Rob's shipped calendar — divergence is
+defensible/better, satisfies his liquidity principle. **SOYMEAL** is the real outlier → reduce its
+forward-ness (shorten `RollOffsetDays -90` and/or hand-edit toward the liquid contract). KOSPI_mini/
+GOLD_micro: rank metric unreliable for many-contract instruments; check absolute volume of the held
+contract before concluding. Net: the seasonal roll-timing question is largely CLOSED (task #25 rolls).
 
 **General rule confirmed:** research/backtest deep history should come from the **most-liquid
 (usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
