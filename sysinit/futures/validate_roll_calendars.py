@@ -74,6 +74,19 @@ def validate(codes: list) -> list:
             row["mono"] = "Y" if cal.check_if_date_index_monotonic() else "N"
             row["valid"] = "Y" if cal.check_dates_are_valid_for_prices(prices) else "N"
             row["rolls"] = len(cal)
+            # truncation check: a single missing mid-chain contract breaks the roll
+            # and silently discards all history after it. Flag when the calendar ends
+            # long before the available contracts do (valid+monotonic won't catch it).
+            contracts = sorted(str(x).split("/")[1][:6]
+                               for x in prices_data.contracts_with_merged_price_data_for_instrument_code(code))
+            if contracts:
+                latest_yr = int(contracts[-1][:4])
+                cal_end_yr = cal.index.max().year
+                # Healthy instruments list contracts ~1-3yr forward (more for STIR),
+                # so only a LARGE gap signals a real mid-chain break, not forward listing.
+                if latest_yr - cal_end_yr >= 5:
+                    row["note"] = (f"TRUNCATED: rolls end {cal_end_yr}, contracts to "
+                                   f"{latest_yr} (mid-chain gap)")
         except Exception as e:
             row["note"] = f"{type(e).__name__}: {str(e)[:50]}"
             results.append(row)
@@ -86,7 +99,7 @@ def validate(codes: list) -> list:
                     row["vs_rob"] = "no-overlap"
                 else:
                     row["vs_rob"] = f"{agree*100:.0f}%"
-                    if agree < AGREE_FLAG:
+                    if agree < AGREE_FLAG and not row["note"]:
                         row["note"] = f"DIVERGES from Rob ({overlap})"
             except Exception as e:
                 row["vs_rob"] = f"err:{type(e).__name__}"
