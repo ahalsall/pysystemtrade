@@ -404,6 +404,25 @@ main-size GAS_US), USDKRW (ends 2018 — investigate)** vs **DIVERGES (seasonal 
 RICE/LEANHOG/LIVECOW/SOYMEAL/SOYOIL/KOSPI_mini/GOLD_micro**. Lesson: `YENEUR-ICE` is the WRONG fix
 (less volume); cross-rate futures aren't inherently thin — check for single missing contracts first.
 
+**YENEUR gap precise window (for CSI contact):** it's actually a **~4-month data hole ~Oct-2000 →
+Feb-2001**, not just one contract: `200009` (Sep'00) present, data ends 2000-09-18; `200012` (Dec'00)
+**entirely absent**; `200103` (Mar'01) present but data only **starts 2001-02-02** (missing its normal
+earlier listing). Neighbors on both sides (Mar/Jun/Sep-2000, Mar/Jun-2001) trade normally → this is a
+**CSI coverage gap, not a contract that never existed** (a real "never existed" gap would sit at the
+series start; the euro launched Jan-1999 and CME listed the full IMM quarterly cycle). ACTION: ask CSI
+about EUR/JPY (RY) coverage Oct-2000→Jan-2001. Confirmed genuinely missing in UA (2026-07-05). Fallbacks
+if CSI can't supply: hand-bridge the one roll (Rob's last resort), accept YENEUR starting ~2001 (minor
+cross), or **synthesize EUR/JPY from EUR/USD × USD/JPY legs** (we have full deep history for both).
+
+**USDKRW FIXED (2026-07-05):** same *symptom* (truncated to 2018) but different *cause* — a
+**config-vs-data cycle mismatch**, not a missing contract. KRX USD/KRW trades **monthly** and CSI
+provides dense monthly contracts, but `rollconfig` used quarterly **HMUZ**, whose contracts don't
+overlap around 2018 (Dec-2018 ends 12-17, Mar-2019 starts 12-21 → no common date → roll breaks). Set
+Hold+Priced cycle to `FGHJKMNQUVXZ` → full 1999-2026 (6658 prices, 324 contracts), validates clean.
+GENERAL PATTERN to watch at scale: an instrument whose rollconfig cycle doesn't match how contracts
+actually trade in the data source silently truncates — the `validate_roll_calendars` truncation check
+(compare calendar end to DATA end) catches it.
+
 **General rule confirmed:** research/backtest deep history should come from the **most-liquid
 (usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
 underlying → identical Panama price series, only the multiplier (in config) differs.
