@@ -392,6 +392,18 @@ phase offset**: our fresh calendar (current `rollconfig`, e.g. RICE `RollOffsetD
 AFTS Part Six** (intended seasonal held maturity) — decide whether to accept ("no one true set of
 stitching dates") or adjust; NOT a data bug. GAS_US_mini still needs main-size `GAS_US` exported.
 
+**Correction + new check (2026-07-05): "thin" YENEUR was a MISDIAGNOSIS.** YENEUR (CME RY EUR/JPY)
+is *not* thin — its contracts have decent density (~90–104 rows). It's a **single missing
+contract**: `YENEUR 200012` (Dec 2000) is absent from the 111-contract HMUZ chain, which breaks
+the roll at Sep-2000 and **silently discards 25yr** (2001–2026). A single mid-chain gap kills all
+history after it, yet passes monotonic+valid (YENEUR scored 97% vs Rob on its 6-month overlap).
+Added a **truncation check** to `validate_roll_calendars` (flag when the calendar ends ≥5yr before
+the latest available contract — 5yr avoids forward-listing false positives). It now cleanly splits
+the flags: **TRUNCATED (data gap): YENEUR (fix = re-export RY incl. Dec-2000), GAS_US_mini (thin →
+main-size GAS_US), USDKRW (ends 2018 — investigate)** vs **DIVERGES (seasonal roll-timing → AFTS):
+RICE/LEANHOG/LIVECOW/SOYMEAL/SOYOIL/KOSPI_mini/GOLD_micro**. Lesson: `YENEUR-ICE` is the WRONG fix
+(less volume); cross-rate futures aren't inherently thin — check for single missing contracts first.
+
 **General rule confirmed:** research/backtest deep history should come from the **most-liquid
 (usually main-size) contract**; the live book trades the capital-efficient mini/micro — same
 underlying → identical Panama price series, only the multiplier (in config) differs.
