@@ -65,7 +65,10 @@ KNOWN_OVERRIDES = {
     # --- Batch 2 (2026-07-06): liquid majors, verified against specs ---
     # equity indices (note: ES/MES are S&P e-minis, NOT Russell as auto-matched)
     "ES": "SP500", "MES": "SP500_micro", "QCN": "NASDAQ_mini", "ND3": "NASDAQ",
-    "RSV": "R1000", "FDX": "DAX", "FCH": "CAC", "FXP": "EURO600", "FTK": "FTSE100",
+    "RSV": "R1000", "FDX": "DAX", "FCH": "CAC", "FXP": "EURO600",
+    "FFI": "FTSE100",   # ICE/LIFFE FTSE100 (GBP, ICE-EU-FIN, exch sym Z) — full history; replaces
+                        # FTK which only had 2018+ with gaps. Drop FTK from the UA portfolio to
+                        # avoid a Day_FTSE100 filename collision (both map to FTSE100).
     "TAI": "FTSETAIWAN", "SSG": "MSCISING", "YA2": "SPI200",
     "JNI": "NIKKEI_large", "JPX": "NIKKEI400", "JTM": "TOPIX", "HIC": "HANG", "HCM": "HANGENT",
     # bonds
@@ -85,6 +88,11 @@ KNOWN_OVERRIDES = {
     # vol
     "VX": "VIX",
 }
+
+
+# CSI symbols to NEVER map — superseded by a better source for the same underlying,
+# so we don't get a filename collision (two CSI symbols -> one PST code).
+IGNORE_CSI_SYMBOLS = {"FTK"}   # limited-history FTSE100; use FFI (ICE, full history) instead
 
 
 def _norm(s: str) -> str:
@@ -224,6 +232,8 @@ def match_all(csi_records: list, pst_index: dict) -> list:
     pst_list = list(pst_index.values())
     for csi in csi_records:
         sym = csi.get("csi_symbol", "")
+        if sym in IGNORE_CSI_SYMBOLS:
+            continue
         if sym in KNOWN_OVERRIDES:
             results.append(dict(csi_symbol=sym, pst=KNOWN_OVERRIDES[sym],
                                 score=99, confidence="OVERRIDE", evidence="seed",
