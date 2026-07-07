@@ -62,6 +62,28 @@ KNOWN_OVERRIDES = {
     # FX
     "RA": "ZAR", "CD": "CAD", "RY": "YENEUR", "MP": "MXP", "SEK": "SEK",
     "M6E": "EUR_micro", "KRW": "USDKRW",     # KRX USD/KRW (distinct from SGX KRWUSD_mini)
+    # --- Batch 2 (2026-07-06): liquid majors, verified against specs ---
+    # equity indices (note: ES/MES are S&P e-minis, NOT Russell as auto-matched)
+    "ES": "SP500", "MES": "SP500_micro", "QCN": "NASDAQ_mini", "ND3": "NASDAQ",
+    "RSV": "R1000", "FDX": "DAX", "FCH": "CAC", "FXP": "EURO600", "FTK": "FTSE100",
+    "TAI": "FTSETAIWAN", "SSG": "MSCISING", "YA2": "SPI200",
+    "JNI": "NIKKEI_large", "JPX": "NIKKEI400", "JTM": "TOPIX", "HIC": "HANG", "HCM": "HANGENT",
+    # bonds
+    "EBS": "SHATZ", "EBM": "BOBL", "EBL": "BUND", "EBX": "BUXL", "BTP": "BTP", "BON": "BONO",
+    "FLG": "GILT", "JG2": "JGB", "CGB": "CAD10", "KT0": "KR10",
+    "FV": "US5", "US": "US20", "TWE": "US20-new", "UL2": "US30",   # US=classic ZB; TWE=2019 20yr
+    # FX
+    "AD": "AUD", "BP": "GBP", "SF": "CHF", "JY": "JPY", "NE": "NZD", "NOK": "NOK",
+    "SIR": "INR", "CY": "CNH",                # CY = offshore renminbi (NOT Brent), verify exchange
+    # metals
+    "GC2": "GOLD", "SI2": "SILVER", "HG2": "COPPER", "PL2": "PLAT", "PA2": "PALLAD",
+    # energy
+    "CL2": "CRUDE_W", "LCO": "BRENT_W", "LGO": "GASOIL", "IHO": "HEATOIL-ICE",
+    # ags
+    "C2": "CORN", "S2": "SOYBEAN", "SB2": "SUGAR11", "CC2": "COCOA", "KC2": "COFFEE",
+    "CT2": "COTTON", "RS": "CANOLA", "FC2": "FEEDCOW", "O2": "OATIES",
+    # vol
+    "VX": "VIX",
 }
 
 
