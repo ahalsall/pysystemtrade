@@ -77,8 +77,8 @@ KNOWN_OVERRIDES = {
     "SIR": "INR", "CY": "CNH",                # CY = offshore renminbi (NOT Brent), verify exchange
     # metals
     "GC2": "GOLD", "SI2": "SILVER", "HG2": "COPPER", "PL2": "PLAT", "PA2": "PALLAD",
-    # energy
-    "CL2": "CRUDE_W", "LCO": "BRENT_W", "LGO": "GASOIL", "IHO": "HEATOIL-ICE",
+    # energy  (CYN=NYMEX Brent Financial (thin); LCO=ICE Brent — same underlying, dedup picks ICE)
+    "CL2": "CRUDE_W", "LCO": "BRENT_W", "CYN": "BRENT", "LGO": "GASOIL", "IHO": "HEATOIL-ICE",
     # ags
     "C2": "CORN", "S2": "SOYBEAN", "SB2": "SUGAR11", "CC2": "COCOA", "KC2": "COFFEE",
     "CT2": "COTTON", "RS": "CANOLA", "FC2": "FEEDCOW", "O2": "OATIES",
