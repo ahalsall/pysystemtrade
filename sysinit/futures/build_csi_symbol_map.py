@@ -74,7 +74,7 @@ KNOWN_OVERRIDES = {
     # bonds
     "EBS": "SHATZ", "EBM": "BOBL", "EBL": "BUND", "EBX": "BUXL", "BTP": "BTP", "BON": "BONO",
     "FLG": "GILT", "JG2": "JGB", "CGB": "CAD10", "KT0": "KR10",
-    "FV": "US5", "US": "US20", "TWE": "US20-new", "UL2": "US30",   # US=classic ZB; TWE=2019 20yr
+    "FV": "US5", "US": "US20", "UL2": "US30",   # US=classic ZB (~20yr basket); US20-new(TWE) dropped
     # FX
     "AD": "AUD", "BP": "GBP", "SF": "CHF", "JY": "JPY", "NE": "NZD", "NOK": "NOK",
     "SIR": "INR", "CY": "CNH",                # CY = offshore renminbi (NOT Brent), verify exchange
@@ -95,6 +95,8 @@ KNOWN_OVERRIDES = {
 IGNORE_CSI_SYMBOLS = {
     "FTK",   # limited-history FTSE100; use FFI (ICE, full history) instead
     "ND3",   # dead full-size Nasdaq-100 (delisted ~2015); use NQ (liquid e-mini, 1999-2026)
+    "TWE",   # 20-Year T-Bond (launched 2022) — structurally thin market-wide (redundant with the
+             # classic ZB=US20 whose 15-25yr basket already holds the 20yr); dropped US20-new.
 }
 
 
