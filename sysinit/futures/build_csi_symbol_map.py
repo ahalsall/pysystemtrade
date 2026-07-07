@@ -64,7 +64,7 @@ KNOWN_OVERRIDES = {
     "M6E": "EUR_micro", "KRW": "USDKRW",     # KRX USD/KRW (distinct from SGX KRWUSD_mini)
     # --- Batch 2 (2026-07-06): liquid majors, verified against specs ---
     # equity indices (note: ES/MES are S&P e-minis, NOT Russell as auto-matched)
-    "ES": "SP500", "MES": "SP500_micro", "QCN": "NASDAQ_mini", "ND3": "NASDAQ",
+    "ES": "SP500", "MES": "SP500_micro", "QCN": "NASDAQ_mini", "NQ": "NASDAQ",
     "RSV": "R1000", "FDX": "DAX", "FCH": "CAC", "FXP": "EURO600",
     "FFI": "FTSE100",   # ICE/LIFFE FTSE100 (GBP, ICE-EU-FIN, exch sym Z) — full history; replaces
                         # FTK which only had 2018+ with gaps. Drop FTK from the UA portfolio to
@@ -92,7 +92,10 @@ KNOWN_OVERRIDES = {
 
 # CSI symbols to NEVER map — superseded by a better source for the same underlying,
 # so we don't get a filename collision (two CSI symbols -> one PST code).
-IGNORE_CSI_SYMBOLS = {"FTK"}   # limited-history FTSE100; use FFI (ICE, full history) instead
+IGNORE_CSI_SYMBOLS = {
+    "FTK",   # limited-history FTSE100; use FFI (ICE, full history) instead
+    "ND3",   # dead full-size Nasdaq-100 (delisted ~2015); use NQ (liquid e-mini, 1999-2026)
+}
 
 
 def _norm(s: str) -> str:
