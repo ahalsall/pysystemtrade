@@ -7,6 +7,17 @@
 ---
 
 ## ⏱ RESUME HERE (2026-07-06)
+**🎯 FIRST DYNAMIC-OPT BACKTEST — SUCCESS (2026-07-06 night).** rob_system template
+(trend+carry → forecast → position sizing → **dynamic optimisation**, dbFuturesSimData, USD,
+$500k, Rob's fitted forecast weights/scalars) on **66 CSI deep-history instruments** (CSI∩data∩
+Rob-config, minus 3 truncated: GAS_US_mini/YENEUR/FEEDCOW). Over **1996→2026 (30yr)**: **Sharpe 1.00,
+ann return 19.9%, ann vol 19.9%, skew −0.69, avg DD −11.8%, max DD −51.1%; dynamic-opt holds 32 of 66
+on the last date** (sparse/capital-efficient — working as designed). Script:
+`sysinit/futures/dynopt_backtest.py`; curve: `private/dynopt_backtest_curve.csv`. NOTE: account-curve
+`.percent` values are already in PERCENTAGE POINTS (don't re-apply `%` formatting). NEXT on backtest:
+rerun at OUR capital (~USD 110k) for realistic held-count; add the 25 CSI instruments not in Rob's
+config (need forecast weights); compare vs equal-weight / non-dynamic; per-instrument P&L attribution.
+
 **CSI Batch 1+2 INGESTED: 94 instruments of deep history** (most 20–30yr). Map 100% resolved
 (`csi_symbol_map.csv`, 94 verified via KNOWN_OVERRIDES in build_csi_symbol_map.py). Roll validation
 (`validate_roll_calendars.py`: monotonic+valid+truncation + vs-Rob): **77/94 clean.**
