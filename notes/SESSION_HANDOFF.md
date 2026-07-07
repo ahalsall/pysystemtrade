@@ -17,11 +17,11 @@ liquid than Rob → ACCEPT (Rob's blog: "no one true set of stitching dates"; hi
 are approximate). KOSPI_mini/GOLD_micro = rank-metric artifact (many contracts).
 
 **TRUNCATIONS — root-caused (2026-07-06): mostly DATA issues, NOT config patches** (user's caution):
-- **FTSE100**: FTK had only 2018+ w/gaps → user found **FFI** (ICE, full history, GBP, exch Z);
-  mapped FFI→FTSE100, FTK in IGNORE_CSI_SYMBOLS. Re-export FFI (overwrites limited FTK data).
-- **US20-new** (missing 2024-25 quarters), **FEEDCOW** (scattered quarter gaps 2016+) → incomplete
-  export; RE-EXPORT / verify CSI coverage.
-- **NASDAQ** (full-size ND3 delisted ~2015) → market structure; 1996-2015 valid, ADD E-mini NQ for current.
+- **FTSE100**: FIXED via **FFI** (ICE, full 1996-2026, 30yr, vs-Rob 100%, clean). FTK ignored.
+- **NASDAQ**: FIXED via **NQ** (liquid e-mini, symbol-linked to 1996; 30yr, vs-Rob 97%, clean). ND3 ignored.
+- **US20-new (TWE)**: PERSISTENT — whole-DB rebuild STILL missing 2024-25 quarters though catalog says
+  TWE active to 2026 → UA/CSI-specific export issue for TWE; flag to CSI (not fixable our end).
+- **FEEDCOW/NOK**: unchanged after full rebuild → CONFIRMED fundamental thinness (vol 300/245), accept.
 - **NOK** thin minor cross (~3mo windows, 5-day overlaps) → accept. **GAS_US_mini** thin (use GAS_US).
   **YENEUR** Dec-2000 CSI gap (§5.5). Principle: don't patch roll config to mask incomplete data.
 **CATALOG (2026-07-06):** user supplied `private/commodityfactsheet.csv` (2604 CSI markets:
