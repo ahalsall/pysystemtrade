@@ -6,20 +6,26 @@
 
 ---
 
-## ⏱ RESUME HERE (2026-07-02)
-**CSI Batch 1 (35 live-tradeable instruments) INGESTED + roll-VALIDATED.** From the
-Windows/UA VM built 07-01, exported 35 instruments (4,912 contracts) → map-built → deep-history
-adjusted prices in the DB (most 20–30yr; AEX 30yr). Symbol map fully resolved
-(`private/data/futures/csi_symbol_map.csv`, 35 verified). Roll QA pass built + run (`validate_roll_calendars.py`: monotonic+valid+truncation, and
-cross-check vs Rob's shipped calendars). **26/36 clean.** FIXED this session:
-SOYMEAL/SOYOIL non-monotonic (dedupe self-heal); **GAS_US** added (NG2→GAS_US, 30yr — deep
-history for thin GAS_US_mini); **USDKRW** quarterly→monthly rollconfig (CSI KRX data is monthly;
-now full 1999-2026). REMAINING flags: **YENEUR** (missing RY Dec-2000 contract → re-export or
-bridge; RY is quarterly-only so monthly trick won't help); **7 seasonal roll-timing divergences**
-(GAS_US/RICE/LEANHOG/LIVECOW/SOYMEAL/SOYOIL/KOSPI_mini/GOLD_micro — correct months+dense data,
-just a phase offset vs Rob → AFTS Part Six review, NOT bugs). See roll_cycles §5.5. UA shopping
-list: `private/csi_batch1_shopping_list.txt`.
-Prior milestone (07-01): pipeline validated end-to-end (see csi_setup_guide.md).
+## ⏱ RESUME HERE (2026-07-06)
+**CSI Batch 1+2 INGESTED: 94 instruments of deep history** (most 20–30yr). Map 100% resolved
+(`csi_symbol_map.csv`, 94 verified via KNOWN_OVERRIDES in build_csi_symbol_map.py). Roll validation
+(`validate_roll_calendars.py`: monotonic+valid+truncation + vs-Rob): **77/94 clean.**
+FIXED: SOYMEAL/SOYOIL monotonicity (dedupe self-heal), **GAS_US** (NG2, 30yr, for thin GAS_US_mini),
+**USDKRW** quarterly→monthly (config-vs-data mismatch), **SOYMEAL** -90→-45 offset (liquidity 47→79%).
+Seasonal divergences ASSESSED via liquidity check: RICE/LEANHOG/LIVECOW/SOYOIL our roll is *more*
+liquid than Rob → ACCEPT (Rob's blog: "no one true set of stitching dates"; his shipped calendars
+are approximate). KOSPI_mini/GOLD_micro = rank-metric artifact (many contracts).
+
+**TRUNCATIONS — root-caused (2026-07-06): mostly DATA issues, NOT config patches** (user's caution):
+- **FTSE100**: FTK had only 2018+ w/gaps → user found **FFI** (ICE, full history, GBP, exch Z);
+  mapped FFI→FTSE100, FTK in IGNORE_CSI_SYMBOLS. Re-export FFI (overwrites limited FTK data).
+- **US20-new** (missing 2024-25 quarters), **FEEDCOW** (scattered quarter gaps 2016+) → incomplete
+  export; RE-EXPORT / verify CSI coverage.
+- **NASDAQ** (full-size ND3 delisted ~2015) → market structure; 1996-2015 valid, ADD E-mini NQ for current.
+- **NOK** thin minor cross (~3mo windows, 5-day overlaps) → accept. **GAS_US_mini** thin (use GAS_US).
+  **YENEUR** Dec-2000 CSI gap (§5.5). Principle: don't patch roll config to mask incomplete data.
+UA shopping lists: `private/csi_batch1_shopping_list.txt`, `csi_batch2_shopping_list.txt`.
+Prior milestones: 07-01 pipeline validated end-to-end; 07-06am systemd timer replaced Barchart cron.
 
 Also today: instrument-universe framework (notes/concepts/instrument_universe.md — research 501
 vs live tradeable, self-scaling, exclude_instrument_lists); **IB tradeability probe**
@@ -35,13 +41,15 @@ vs live tradeable, self-scaling, exclude_instrument_lists); **IB tradeability pr
   contract-volume `v`, specs file ON, all continuation/adjust features OFF — PST does its own).
 
 **NEXT STEPS (in order):**
-1. FIX the 8 roll-flagged Batch-1 instruments (per-instrument, NOT batched — Rob's rule):
-   SOYMEAL/SOYOIL non-monotonic (rebuild/hand-edit CSV); GAS_US_mini thin (add main-size GAS_US);
-   RICE/KOSPI_mini/LEANHOG/LIVECOW seasonal held-month review (AFTS Part Six input helps);
-   re-run `validate_roll_calendars` after.
-2. First-notice/delivery-timing audit for physically-settled names (§5.3 checklist).
-3. Expand to Batch 2 → full research universe (~501) in UA; same flow:
-   build_csi_symbol_map --specs (auto-HIGH + pin residue in KNOWN_OVERRIDES) → --rename → --instruments all → validate.
+1. RE-EXPORT the data-issue truncations (better/complete sources, NOT config patches):
+   FTSE100 via **FFI** (already mapped); US20-new + FEEDCOW (fuller CSI pull); add **E-mini Nasdaq NQ**.
+   Then `build_csi_symbol_map` → `--rename` → `--instruments all` → `validate_roll_calendars`.
+2. YENEUR RY Dec-2000 CSI follow-up (bridge/accept/synthesize from legs — §5.5).
+3. Batch 3 → full research universe (~501) in UA; same flow. Map auto-resolves knowns (94 pinned +
+   CYN/FFI pre-registered); pin any new residue in KNOWN_OVERRIDES.
+4. First-notice/delivery-timing audit for physically-settled names (§5.3 checklist).
+5. Once universe is broad: run duplicate-markets + cost/liquidity reports on OUR data to populate
+   duplicate_instruments (§4 of instrument_universe.md) + trading_restrictions + bad_markets.
 4. Nightly cron: UA scheduled export (auto-login) → `--rename` → process → validate.
 5. Dup-date check on CSI+barchart/IB tail-merge (saw 23:00 vs 00:00 mix).
 6. Pipeline flow now = 3 cmds (map build → --rename loads csi_symbol_map.csv → --instruments all).
