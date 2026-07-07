@@ -1,7 +1,7 @@
 # SESSION HANDOFF — pysystemtrade Barchart pipeline & AFTS strategy work
 
 **Purpose:** durable backup so this work can be fully resumed from a fresh session.
-**Last updated:** 2026-07-01 (work by Andrew Halsall + Claude).
+**Last updated:** 2026-07-06 (work by Andrew Halsall + Claude).
 **Repo:** /home/andrew/pysystemtrade · branch `develop` · fork `ahalsall/pysystemtrade` (origin), upstream `robcarver17/pysystemtrade`.
 
 ---
@@ -52,9 +52,8 @@ vs live tradeable, self-scaling, exclude_instrument_lists); **IB tradeability pr
   contract-volume `v`, specs file ON, all continuation/adjust features OFF — PST does its own).
 
 **NEXT STEPS (in order):**
-1. RE-EXPORT the data-issue truncations (better/complete sources, NOT config patches):
-   FTSE100 via **FFI** (already mapped); US20-new + FEEDCOW (fuller CSI pull); add **E-mini Nasdaq NQ**.
-   Then `build_csi_symbol_map` → `--rename` → `--instruments all` → `validate_roll_calendars`.
+1. Remaining truncations: FTSE100(FFI)+NASDAQ(NQ) DONE. **US20-new(TWE)**: flag to CSI (persistent
+   missing 2024-25 quarters even after full rebuild). FEEDCOW/NOK: accept as thin. YENEUR: §5.5.
 2. YENEUR RY Dec-2000 CSI follow-up (bridge/accept/synthesize from legs — §5.5).
 3. Batch 3 → full research universe (~501) in UA; same flow. Map auto-resolves knowns (94 pinned +
    CYN/FFI pre-registered); pin any new residue in KNOWN_OVERRIDES.
