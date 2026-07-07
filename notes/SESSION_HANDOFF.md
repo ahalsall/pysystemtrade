@@ -24,6 +24,17 @@ are approximate). KOSPI_mini/GOLD_micro = rank-metric artifact (many contracts).
 - **NASDAQ** (full-size ND3 delisted ~2015) → market structure; 1996-2015 valid, ADD E-mini NQ for current.
 - **NOK** thin minor cross (~3mo windows, 5-day overlaps) → accept. **GAS_US_mini** thin (use GAS_US).
   **YENEUR** Dec-2000 CSI gap (§5.5). Principle: don't patch roll config to mask incomplete data.
+**CATALOG (2026-07-06):** user supplied `private/commodityfactsheet.csv` (2604 CSI markets:
+SymbolUA, Name, Exchange, Currency, ContractSize, **LastTotalVolume**, Start/End). Built
+`csi_catalog_map.py` (reverse PST→CSI lookup, volume-ranked) — BUT it agrees with our 94 spec-verified
+only ~37/95 (name matching too coarse for same-family: soy meal/oil, EU sector vs main index, micros).
+So it's an **AUDIT-FIRST LOOKUP** (candidates+volume+coverage dates), NOT a blind auto-mapper; real map
+stays in KNOWN_OVERRIDES. Wins: FFI→FTSE100 (deep, 1984), NQ→NASDAQ (liquid), confirmed TWE (US20-new)
+data exists → incomplete export. Pre-registered CYN→BRENT, FFI→FTSE100, NQ→NASDAQ; FTK/ND3 in
+IGNORE_CSI_SYMBOLS. **COVERAGE REPORT** (`private/csi_coverage_report.csv`, reliable): 65/95 verified
+are ≥20yr (grains→1949, metals 1963-75, FX 1972, gold 1975); flagged THIN: FEEDCOW/NOK/SEK/RICE/OATIES,
+US20-new(vol0)/NASDAQ_mini(vol0)/BRENT-CYN. ~179 more deep candidates in the tentative set → prioritize
+next exports by depth+volume.
 UA shopping lists: `private/csi_batch1_shopping_list.txt`, `csi_batch2_shopping_list.txt`.
 Prior milestones: 07-01 pipeline validated end-to-end; 07-06am systemd timer replaced Barchart cron.
 
