@@ -6,8 +6,32 @@
 
 ---
 
-## ⏱ RESUME HERE (2026-07-08 pm)
-**🚨🔧 BARCHART TIMER WAS CONTAMINATING CSI — DISABLED; re-ingesting clean.** The
+## ⏱ RESUME HERE (2026-07-08 night)
+**✅ CLEAN CSI-ONLY DB + TRUSTWORTHY BASELINE + AFTS-VALIDATED. Overnight 20% sweep queued.**
+State: CSI-only cutover COMPLETE & clean (all core instruments fresh to 2026-07-07, 0
+deflator-broken, 0 barchart residue; barchart-buildout timer DISABLED and MUST STAY OFF —
+it clobbered the DB at 08:00, see below). Confirmed baseline (full universe 106, $110k, 25%,
+estimated weights): **Sharpe 0.89, ann 11.9%, vol 13.3%, skew -0.03, maxDD -40.5%, avgDD -9.1%,
+86/106 funded** — reproduced across two clean re-ingests. FAITHFUL-APPLICATION MILESTONE CLOSED:
+methodology matches AFTS Strategy 25 exactly (shadow_cost 50, greedy tracking-error, Bσ=0.05τ);
+static-selection counts track Rob's report (25/34 vs 28/35); forecast repro ~4% off (data vintage).
+**AFTS Table 128 benchmark (Rob dynamic-opt, Strategy 11):** $100k SR 1.06 @ 18.8% vol, avgDD
+-9.6%; $500k SR 1.22 @ 21.1%. **Our vs Rob:** avgDD matches (-9.1 vs -9.6); VOL SHORTFALL
+(13.3% of 25% vs Rob 18.8% of 20%) = MISSING MICROS (Rob's small-acct universe is micro-rich;
+task #27 gates production #30); Sharpe gap (0.89 vs 1.06) = 2022-26 drought in-sample + rules
+(rob_system vs Strategy11) + 25 vs 20 target. **-40.5% DD attributed** (2020-2025 drought): Equity
+-25 (EUROSTX/SMI/MSCIWORLD) + Bond -11 (BUND/KR10/KR3), offset by Ags/Sector. $500k -76.5% is a
+non-monotonic outlier (deeper than $1M) — attribution HUNG on non-PSD-covariance corner case at
+$500k, re-verify at 20% first. Persistence infra: sysinit/futures/backtest_results.py -> saved
+runs in private/backtest_runs/; `python -m ...backtest_results` tables all. Ref chapter:
+private/reference_for_claude/ (AFTS Strategy 25 pdf, read in full). NEXT: overnight 20%-target
+capital sweep (`CAPITALS="110000,300000,500000,1000000" uv run python -m sysinit.futures.dynopt_capital_sweep`,
+VOL_TARGET=20 default); then micro decision (#27, AFTS-armed) -> finalize universe -> production
+paper track (#30). Tasks: #25 QA, #26 SOYMEAL, #27 micros(gates #30), #28 roll truncations,
+#29 cutover(keep open till survives tomorrow's dead-timer 08:00), #30 IBKR paper.
+
+--- (contamination incident, now resolved) ---
+**🚨🔧 BARCHART TIMER WAS CONTAMINATING CSI — DISABLED; re-ingested clean.** The
 "first trustworthy backtest" below was FALSE: the `barchart-buildout` systemd --user timer
 (OnCalendar 08:00 daily, set up early in the session for the pre-CSI build-out) fired
 **2026-07-08 08:00→09:16**, the morning AFTER the overnight CSI re-ingest, and CLOBBERED the
