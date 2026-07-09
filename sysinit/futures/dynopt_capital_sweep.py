@@ -69,7 +69,7 @@ for cap in CAPITALS:
     stats = full_stats(acc, cap, extra=dict(vol_target=VOL_TARGET, funded=funded,
                                             held_last=held_last, universe=len(our),
                                             weights="estimated"))
-    outdir = save_run(f"capsweep_{int(cap)}", acc, cap, stats)  # curve + stats persisted
+    outdir = save_run(f"capsweep_vt{int(VOL_TARGET)}_{int(cap)}", acc, cap, stats)  # curve+stats
     print(f"  Sharpe {stats['sharpe']:.2f} | ann {stats['ann_return_pct']:.1f}% | "
           f"REALIZED vol {stats['ann_vol_pct']:.1f}% (target {VOL_TARGET:.0f}%) | maxDD {stats['max_dd_pct']:.1f}% | "
           f"AVG DD {stats['avg_dd_pct']:.1f}% | skew {stats['skew']:.2f} | "
