@@ -49,6 +49,51 @@ CAPITALS = [float(x) for x in os.environ.get("CAPITALS", "110000,300000,500000,1
 VOL_TARGET = float(os.environ.get("VOL_TARGET", 20))
 print(f"universe {len(our)} clean instruments (of {len(cands)}) | estimated weights | "
       f"vol target {VOL_TARGET:.0f}% (AFTS uses 20%)\n", flush=True)
+
+
+def fast_attribution(system, our, acc, pos, capital, outdir):
+    """Position x return drawdown attribution over the auto-detected worst-DD window.
+    Reuses the built system + already-computed optimised positions (NO optimiser re-run,
+    so it can't hang like pandl_for_optimised_instrument did at $500k). Vectorised per
+    instrument, per-instrument try/except. Saves attribution.csv + positions.parquet
+    (raw material to slice ANY window offline). Relative ranking is robust; absolute $
+    approximate (back-adj roll gaps). Returns a summary dict."""
+    raw = acc.as_ts
+    raw = raw() if callable(raw) else raw
+    port = pd.Series(raw).replace([np.inf, -np.inf], np.nan).dropna()
+    cum = port.cumsum(); dd = cum - cum.cummax()
+    trough = dd.idxmin(); peak = cum.loc[:trough].idxmax()
+    rows = []
+    for code in our:
+        try:
+            p = pos[code].dropna()
+            if p.abs().sum() == 0:
+                continue
+            price = system.rawdata.get_daily_prices(code).reindex(p.index).ffill()
+            block = float(system.data.get_value_of_block_price_move(code))
+            try:
+                fx = pd.Series(system.data.get_fx_for_instrument(code, "USD")).reindex(p.index).ffill()
+            except Exception:
+                fx = pd.Series(1.0, index=p.index)
+            pnl = (p.shift(1) * price.diff() * block * fx).replace([np.inf, -np.inf], np.nan).dropna()
+            rows.append(dict(instrument=code, asset=pidx.get(code, {}).get("asset_class", "?"),
+                             worstDD_k=round(float(pnl.loc[peak:trough].sum()) / 1000, 1),
+                             full_k=round(float(pnl.sum()) / 1000, 1)))
+        except Exception:
+            continue
+    adf = pd.DataFrame(rows).set_index("instrument")
+    adf.to_csv(os.path.join(outdir, "attribution.csv"))
+    try:
+        pos.to_parquet(os.path.join(outdir, "positions.parquet"))
+    except Exception:
+        pos.to_csv(os.path.join(outdir, "positions.csv"))
+    losers = adf.sort_values("worstDD_k").head(6)
+    return dict(dd_peak=str(peak.date()), dd_trough=str(trough.date()),
+                dd_pct=round(float(dd.min() / capital * 100), 1),
+                by_asset=adf.groupby("asset")["worstDD_k"].sum().round(0).to_dict(),
+                top_losers=list(losers.index))
+
+
 rows = []
 for cap in CAPITALS:
     config = Config("systems.provided.rob_system.config.yaml")
@@ -74,6 +119,12 @@ for cap in CAPITALS:
           f"REALIZED vol {stats['ann_vol_pct']:.1f}% (target {VOL_TARGET:.0f}%) | maxDD {stats['max_dd_pct']:.1f}% | "
           f"AVG DD {stats['avg_dd_pct']:.1f}% | skew {stats['skew']:.2f} | "
           f"funded {funded}/{len(our)} | held today {held_last}  -> {outdir}", flush=True)
+    try:
+        att = fast_attribution(system, our, acc, pos, cap, outdir)
+        print(f"  attribution: worstDD {att['dd_pct']}% [{att['dd_peak']}..{att['dd_trough']}] "
+              f"by-asset {att['by_asset']} | top losers {att['top_losers']}", flush=True)
+    except Exception as e:
+        print(f"  (attribution skipped: {type(e).__name__}: {e})", flush=True)
     rows.append(stats)
 
 print(f"\n=== CAPITAL SWEEP SUMMARY (clean CSI, estimated weights, {VOL_TARGET:.0f}% target) ===")
