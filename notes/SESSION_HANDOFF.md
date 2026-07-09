@@ -1,12 +1,131 @@
 # SESSION HANDOFF — pysystemtrade Barchart pipeline & AFTS strategy work
 
 **Purpose:** durable backup so this work can be fully resumed from a fresh session.
-**Last updated:** 2026-07-06 (work by Andrew Halsall + Claude).
+**Last updated:** 2026-07-07 (work by Andrew Halsall + Claude).
 **Repo:** /home/andrew/pysystemtrade · branch `develop` · fork `ahalsall/pysystemtrade` (origin), upstream `robcarver17/pysystemtrade`.
 
 ---
 
-## ⏱ RESUME HERE (2026-07-06)
+## ⏱ RESUME HERE (2026-07-08 pm)
+**🚨🔧 BARCHART TIMER WAS CONTAMINATING CSI — DISABLED; re-ingesting clean.** The
+"first trustworthy backtest" below was FALSE: the `barchart-buildout` systemd --user timer
+(OnCalendar 08:00 daily, set up early in the session for the pre-CSI build-out) fired
+**2026-07-08 08:00→09:16**, the morning AFTER the overnight CSI re-ingest, and CLOBBERED the
+clean CSI DB — re-added the 75 barchart-only instruments (WHEAT_mini/WHEY…, back to 205) and
+overwrote CSI series with STALE barchart data → truncated roll calendars (CORN→2022-09,
+SP500→2024-09) → truncated adjusted/multiple. My 07-08 backtests (Sharpe 0.74/0.89, run after
+09:16) were on this CONTAMINATED DB → DISCARD. The Phase-2 gate wasn't buggy — it ran before
+08:00 when the DB was genuinely clean. CSI CONTRACT DATA IS FINE (CORN contracts overlap richly,
+fresh to 2026-07-07). FIX APPLIED: `systemctl --user disable --now barchart-buildout.timer`
+(now disabled+inactive, 0 timers) — **MUST STAY DISABLED under CSI-only** (two writers on one
+parquet DB = the whole bug). Re-archived contaminated stores (…_bcontam_2026-07-08_1345,
+reversible; spotfx+positions preserved), re-ingesting CSI-only from intact staging (147 fresh).
+NEXT: on re-ingest done → data_freshness_audit.py must PASS (0 stale/broken/residue) → trustworthy
+full-universe backtest + estimated-weights + drawdown attribution (all pending, none valid yet).
+Task #29 REOPENED effectively (contamination) — see [[barchart-pipeline-project]].
+
+--- (the below was the contaminated run, retained for context) ---
+## ⏱ (SUPERSEDED) 2026-07-08 first-backtest attempt
+**✅ CUTOVER DONE → FIRST TRUSTWORTHY BACKTEST (2026-07-08).** CSI-only cutover COMPLETE:
+archived 3 futures parquet stores (barchart_archive_2026-07-07_2230, reversible; spotfx +
+positions preserved), re-ingested all 147 fresh CSI (0 failed). Gate (data_freshness_audit.py):
+0 broken-deflator, 0 barchart-residue, 0 missing; 17 stale = the known truncations (data
+genuinely ends early, task #28), auto-excluded now by a DYNAMIC STALENESS GUARD in
+dynopt_backtest.py (STALE_DAYS=45, replaces the old hardcoded EXCLUDE/BROKEN; the 4 ex-breakers
+CORN/CRUDE_W/SOYBEAN/WHEAT are FRESH+included). 26 negative-price instruments (Brent/COCOA/CRUDE
+back-adj zero-cross) — watch, don't break deflator. **FIRST TRUSTWORTHY RESULT** (full universe
+106, $110k, 25% vol, data→2026-07-07): Sharpe 0.74, ann 9.0%, vol 12.2%, maxDD -25.2%, 85/106
+ever-funded, ALL asset classes. DISCARD all earlier session numbers (-51/-46/-45% DD, Sharpe~1)
+— deflator-freeze artifacts. KEY REAL FINDING (opposite of the false narrative): at $110k the
+book diversifies broadly but UNDER-INVESTS — realized 12.2% vs 25% target — the genuine
+small-capital integer-lumpiness cost (capital-dependent: $1M realizes ~20%). Sharpe 0.74 is a
+modest baseline (<Rob's ~1.0) → legit tuning question (equal-1/N vs handcrafted weights,
+universe, 2021-25 trend drought), NOT a bug. NEXT (all now trustworthy): clean vol-target sweep,
+$110k-vs-$1M, static selection on clean data + Rob diff, drawdown attribution, Sharpe investigation.
+Baseline milestone: reproduce a known Rob result (see [[validation-before-strategy-changes]]).
+
+--- superseded debug notes below ---
+**✅ ROOT CAUSE FOUND → CSI-ONLY CUTOVER (2026-07-07 night).** ALL dynamic-opt backtest
+numbers this session (−51/−46/−45% DD, Sharpe ~1, "small-capital concentration", "need
+micros", vol-target sweep) were CORRUPTED by ONE bug and must be discarded. **Root cause:
+STALE two-source data** — Barchart (hourly) series under CSI codes, ffill'd flat >180d →
+`calculate_cost_deflator` (syscore/pandas/strategy_functions.py) `final_vol=0` → inf cost →
+`inf*0=NaN` in optimiser `calculate_costs` → optimiser FREEZES to prior positions ~99% of
+days → fake concentrated book. PROOF: excluding the 4 flat-tail breakers (CORN/CRUDE_W/
+SOYBEAN/WHEAT) → optimiser errors 7772→3, funded 5→22 of 23, diversified across ALL asset
+classes incl. full-size bonds (BOBL/BTP/FED/KR3) at $110k. So the affordability/micro
+narrative was FALSE (task #27 deprioritized). **DECISION: CSI-only single-source sim DB**
+(purge/silo Barchart). Gate `data_freshness_audit.py` on current DB = FAIL: 75 Barchart-only
+residue, 88 stale(>10d), 4 broken-deflator, 27 negative-price. **Checklist: notes/csi_cutover_
+validation.md.** User is rebuilding CSI CSVs. NO instrument adds/drops (micro-Treasuries not
+in CSI; universe stays 147/150). NEXT (post-rebuild): archive parquet → CSI-only re-ingest →
+`data_freshness_audit.py` until PASS → remove the 4 from BROKEN set in dynopt_backtest.py →
+first TRUSTWORTHY full-universe backtest + clean vol sweep + static selection + attribution.
+Debug artifacts: idm_diagnostic.py (IDM=2.5 fine), cost_nan_check.py, optimiser_input_check.py
+(found the inf), dynopt_backtest.py (SELECTION/CAPITAL env, currency metrics, BROKEN set).
+Static selection WORKS (static_instrument_selection.py: 26@110k/34@250k/57@1M, tracks Rob's
+report). Rob refs: Static_selection_of_instruments + Duplicate_markets_report (github robcarver17/reports).
+
+--- earlier debug notes (superseded by root-cause above) ---
+- Static instrument selection WORKS (`static_instrument_selection.py`): our 26 @ $110k, 34 @
+  $250k, 57 @ $1M, counts track Rob's published `Static_selection_of_instruments` report
+  (25 vs 28, 34 vs 35). Rob reports: Static_selection_of_instruments + Duplicate_markets_report.
+- The DYNAMIC OPTIMISER degenerates: on the 26-set it funds only 5-7 instruments and NEVER
+  holds equities/sectors/metals/energy, at BOTH $110k AND $1M (near-identical Sharpe 0.97/0.98,
+  DD −46%/−45%) — i.e. CAPITAL-INVARIANT, so it's NOT affordability. DOW's upstream optimal is
+  ~2.4 contracts (52% wt) yet held 0 at both capitals.
+- RULED OUT: IDM (=2.5, correct), per-instrument spreadcosts (all 26 valid), system construction
+  (byte-identical to canonical `sysproduction/strategy_code/run_rob_dynamic_system.py`).
+- MECHANISM: `optimised_positions_stage.get_optimal_positions_with_fixed_contract_values` wraps
+  `optimise_positions()` in try/except that RETURNS previous_positions on ANY exception. The
+  greedy throws "Trade costs are zero" (actually `np.isnan(trade_costs)`, optimisation.py:258)
+  ~99% of days at $110k (7772 hits) -> positions FREEZE/carry-forward -> degenerate book.
+  "All zeros in optimisation" fallback is capital-driven (7772→3 at $1M) but the freeze persists.
+- SUSPECTS: (a) my backtest forces equal 1/N weights + use_instrument_weight_estimates=False
+  (Rob uses estimated correlation-aware weights) — prime suspect; (b) a NaN in costs/covariance
+  input for the never-funded instruments. Diagnostic running: `optimiser_input_check.py` prints
+  target_contracts/cost/per_contract_value/variance per instrument (DOW vs FED) to find the NaN.
+NEXT: read optimiser_input_check result; then re-run canonically with ESTIMATED weights (no
+equal-weight override) as the known-good baseline. Scripts: dynopt_backtest.py (SELECTION+CAPITAL
+env, currency metrics), idm_diagnostic.py, cost_nan_check.py, optimiser_input_check.py.
+
+**🎯 LIVE-150 UNIVERSE INGESTED (2026-07-07 midday).** Andrew batch-added the 53 codes to CSI;
+all 53 arrived + validated 1:1 (CSI market name vs PST desc), mapped in KNOWN_OVERRIDES +
+`csi_symbol_map.csv` (now 147). Imported via `csi_pipeline` (rename + full price/roll/multiple/
+adjusted chain): **53/53 succeeded, 0 failed, all in parquet.** Roll validation: **39/53 clean**
+(all monotonic+valid). **14 flagged → TASK #28:** TRUNCATED/mid-chain-gap (lose recent history):
+BRE(2000) US3(2010) GAS-LAST(2006) US-REALESTATE(2007) EPRA-EUROPE(2010) EU-TECH(2008)
+FTSECHINAH(2018) FTSEINDO(2017) OMX(1996) GBPEUR(1999) VNKI(2012); DIVERGES-from-Rob: NIKKEI(34%)
+REDWHEAT(18%) SOFR(43%). 39 clean are backtest-ready.
+**🔑 KEY BACKTEST FINDING (attribution):** at $500k the greedy-integer dynamic-opt only ever
+FUNDS 9 instruments (LEANHOG SOYOIL SOYMEAL PLAT RICE PALLAD LIVECOW SP500_micro NASDAQ_micro) —
+expensive full-size contracts round to ZERO. So the -51% DD = concentrated ags/livestock/metals/
+micro-equity book, NOT diversified-system failure. At real ~$110k it's worse. **Fix = micro/mini
+contracts (TASK #27 audit)** — why Rob's jumbo uses MYM/MNQ/MES/M2K/MGC. NEXT: rerun backtest at
+~$110k on the expanded 150 to see if the optimiser now diversifies (affordable contracts across
+all asset classes), and to empirically drive the micro audit. Open tasks: #26 SOYMEAL carry,
+#27 micro audit, #28 roll review, #25 QA audit.
+
+**🎯 AFTS JUMBO PORTFOLIO CROSS-CHECKED (2026-07-07).** Andrew supplied the jumbo scan
+(6 imgs, `private/jumbo portfolio/`, AFTS Tables 172-183 = **102 instruments**). Full
+reconciliation in `private/jumbo_reconciliation.csv`: **65 DONE / 29 ADD(live) / 3 COVERED /
+2 DEAD / 3 FLAG → 97/102 fully covered.** NOTE: jumbo "Market code" col is Rob's exchange code
+(ZN/GBL/SXAP), NOT the CSI SymbolUA — used only to confirm membership. Cross-check FIXED my
+first-pass errors: CHEESE(CSC) & HEATOIL(HO2, NY Harbor ULSD deep-1978) were mis-filed DEEP →
+are jumbo; GASOILINE switched IRB(ICE)→**RB2**(NYMEX RBOB, jumbo=RB, v156k deeper); RUR/EDOLLAR
+were SKIP → jumbo-but-dead (EDOLLAR=CSI ED 1981-2023 = 42yr STIR, research-deep). Findings:
+jumbo has **EU sectors(8) but NO US sectors** (my 9 US-sector picks = Rob-cfg extras, not jumbo);
+jumbo uses minis/last-day (WTI-mini QM→covered by full CRUDE_W=CL2; EUR-full→covered by
+EUR_micro=M6E; EU-Utils-600→proxy EU-DJ-UTIL=DEW). **FLAG/verify in UA:** USIRS10(N1U)+
+USIRS5ERIS(LIW) = obscure swaps, no clean CSI (likely omit); SGD(SND)=no CSI USD/SGD (unavailable).
+**JUMBO LIVE-ADD (29 CSI codes, batch-add now):** `TU T3 TN BTS KTB M2K EMD SCP DED DJS DJH DJI
+DJE DJY DJV FT5 II2 JNM FVS RP BR5 ETH BZN HH RB2 HO2 ER CSC KW2`. Slot math: 94 done + 29 jumbo
+= 123 → **27 slots** for best non-jumbo extras (top: SOFR/SR3, EURIBOR/FEI, FED/FF modern STIRs
+replacing dead Eurodollar; MSCIWORLD/MWO; real-estate REI/SPR/JRE/EPR; then US/EU sector extras).
+Superseded `private/csi_gap_confirmed.csv` (pre-jumbo CORE/BLOCK/DEEP/SKIP; still valid for the
+non-jumbo extras pool). Deep-history symbol convention: US20=US, US10=TY, US5=FV, SILVER=SI2,
+GOLD=GC2 (2-letter/#2, NOT Globex). Evidence: `private/csi_gap_candidates.txt`.
+
 **🎯 FIRST DYNAMIC-OPT BACKTEST — SUCCESS (2026-07-06 night).** rob_system template
 (trend+carry → forecast → position sizing → **dynamic optimisation**, dbFuturesSimData, USD,
 $500k, Rob's fitted forecast weights/scalars) on **66 CSI deep-history instruments** (CSI∩data∩

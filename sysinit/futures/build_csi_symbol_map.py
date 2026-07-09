@@ -87,6 +87,28 @@ KNOWN_OVERRIDES = {
     "CT2": "COTTON", "RS": "CANOLA", "FC2": "FEEDCOW", "O2": "OATIES",
     # vol
     "VX": "VIX",
+    # --- live-150 expansion (2026-07-07): 29 AFTS jumbo adds + 24 merit extras.
+    # CSI market names validated 1:1 against PST descriptions before ingest. ---
+    # jumbo: bond curve / STIRs
+    "TU": "US2", "T3": "US3", "TN": "US10U", "BTS": "BTP3", "KTB": "KR3",
+    # jumbo: equity index minis
+    "M2K": "RUSSELL", "EMD": "SP400", "FT5": "FTSECHINAH", "II2": "NIFTY", "JNM": "NIKKEI",
+    # jumbo: EU sectors + broad
+    "DJS": "EU-BASIC", "DJH": "EU-HEALTH", "DJI": "EU-INSURE", "DJE": "EU-OIL",
+    "DJY": "EU-TECH", "DJV": "EU-TRAVEL", "SCP": "DJSTX-SMALL", "DED": "EU-DIV30",
+    # jumbo: vol / fx / crypto / energy / ags
+    "FVS": "V2X", "RP": "GBPEUR", "BR5": "BRE", "ETH": "ETHEREUM", "BZN": "BRENT-LAST",
+    "HH": "GAS-LAST", "RB2": "GASOILINE", "HO2": "HEATOIL", "ER": "BBCOMM",
+    "CSC": "CHEESE", "KW2": "REDWHEAT",
+    # merit extras: modern STIRs (replace dead Eurodollar), diversifiers
+    "SR3": "SOFR", "FEI": "EURIBOR", "FF": "FED", "MWO": "MSCIWORLD", "CON": "CH10",
+    "REI": "US-REALESTATE", "SPR": "US-PROPERTY", "JRE": "JP-REALESTATE",
+    "EPR": "EPRA-EUROPE", "EOX": "OMX", "ESM": "SMI-MID", "IBV": "BOVESPA",
+    "MIN": "FTSEINDO", "JNV": "VNKI", "HRN": "STEEL",
+    # merit extras: US sector suite
+    "SPE": "US-ENERGY", "SPF": "US-FINANCE", "SPH": "US-HEALTH", "SPI": "US-INDUSTRY",
+    "SPM": "US-MATERIAL", "SPS": "US-STAPLES", "SPT": "US-TECH", "SPU": "US-UTILS",
+    "SPD": "US-DISCRETE",
 }
 
 
