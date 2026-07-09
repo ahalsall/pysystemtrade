@@ -6,7 +6,30 @@
 
 ---
 
-## ⏱ RESUME HERE (2026-07-08 night)
+## ⏱ RESUME HERE (2026-07-09 morning)
+**✅ OVERNIGHT CAPITAL SWEEP DONE (20% + 25%, clean CSI, 8/8 runs, attribution+curves persisted
+in private/backtest_runs/capsweep_vt{20,25}_{cap}/).** `uv run python -m sysinit.futures.backtest_results`
+tables all. RESULTS (Sharpe / realized-vol / maxDD / avgDD, funded):
+- VT20 (AFTS parity): $110k 0.89/10.8%/-20.5%/-6.5% (81f) · $300k 0.92/13.8%/-38.1%/-9.3% · $500k
+  0.92/15.2%/-47.0%/-10.7% · $1M 0.92/16.3%/-56.8%/-11.7% (97f). CLEAN & MONOTONIC.
+- VT25: $110k 0.89/13.3%/-40.5%/-9.1% · $300k 0.93/16.9%/-50.2%/-11.1% · $500k 0.83/18.3%/**-76.5%**/-14.6%
+  · $1M 0.88/19.6%/-55.7%/-12.7%.
+KEY: (1) -76.5% is REAL not contamination (reproduced $500k/25%, avgDD -14.6% also elevated) BUT
+specific to $500k/25% — at 20% that point is a normal -47%; it's a discrete-optimiser path
+sensitivity, and **20% target is more robust** (monotonic DD, stable SR) = another reason to use
+20% (AFTS parity). (2) VOL SHORTFALL confirmed both targets: ~53-54% of target at $110k climbing
+to ~78-82% at $1M = the missing-micros gap (task #27). (3) AFTS Table 128: Rob dyn-opt $100k SR
+1.06 @ 18.8% vol / $500k 1.22 @ 21.1%; OURS vt20 $110k 0.89 @ 10.8% / $500k 0.92 @ 15.2% -> Rob
+deploys ~2x our risk at same capital (micro-rich universe), our SR lower (2022-26 drought in-sample
++ rob_system vs Strategy11 rules), our DD/vol slightly worse (diversification quality + period).
+(4) Attribution consistent across all runs = 2020-2025 trend drought in Equity/Bond/Sector/Metals
+(recurring losers SP400, US-ENERGY, MSCIWORLD, KR3, GOLD_micro, SMI, ALUMINIUM, BUND); Ags/OilGas/FX
+often offset. positions.parquet saved per run for offline window slicing. NEXT: micro decision
+(#27, now fully armed with AFTS + this sweep) -> finalize universe -> production (#30). Consider
+switching rob_system config default to 20% target (more robust + AFTS parity).
+
+--- (prior night's state) ---
+## ⏱ (2026-07-08 night)
 **✅ CLEAN CSI-ONLY DB + TRUSTWORTHY BASELINE + AFTS-VALIDATED. Overnight 20% sweep queued.**
 State: CSI-only cutover COMPLETE & clean (all core instruments fresh to 2026-07-07, 0
 deflator-broken, 0 barchart residue; barchart-buildout timer DISABLED and MUST STAY OFF —
