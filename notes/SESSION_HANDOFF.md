@@ -450,3 +450,21 @@ scales ~linearly with target while IDM cap + attenuation stay intact/protective;
 raising the IDM cap is the WRONG lever (reintroduces the correlation-breakdown tail risk the cap exists to prevent).
 RECOMMENDATION: leave it. Risk-adjusted return (Sharpe) is what compounds and it matches Rob. 15.2% = system being prudent.
 Scripts: gap_decomposition.py, scaling_diagnostic.py (+ private/scaling_diagnostic.csv, private/gap_decomp.log).
+
+### Gap audit — LEVER EXPERIMENTS refine the verdict (2026-07-12); IDM-cap hypothesis REFUTED
+Ran fractional full-stats experiments (sysinit/futures/gap_experiments.py) on the two deployment levers.
+Results (vol/ret/DD scaled to %; .percent curve is already x100):
+  BASE 20%/cap2.5 : vol 15.2 ret 14.0 SR 0.92 maxDD -47 skew -0.31 IDM 2.50 | SR96-21 1.05
+  EXP1 26%/cap2.5 : vol 18.9 ret 16.2 SR 0.86 maxDD -75 skew -0.43 IDM 2.50 | SR96-21 1.02
+  EXP2 20%/NO cap : vol 15.5 ret 14.1 SR 0.91 maxDD -55 skew -0.28 IDM 2.84 | SR96-21 1.06
+  EXP3 26%/NO cap : vol 19.2 ret 16.4 SR 0.86 maxDD -77 skew -0.43 IDM 2.84 | SR96-21 1.02
+(maxDD on cumulative %-return path, identical method across rows.)
+
+REFINEMENT: the earlier "IDM cap (2.5) suppresses deployment; correct IDM ~3.8" was WRONG — removing the
+cap raises IDM only 2.50->2.84 and vol only 15.2->15.5% (Sharpe flat). The cap is barely binding. The real
+constraint is the IDM ESTIMATOR being (correctly) conservative about a genuinely diversified 106-inst book
+(uncapped it only wants 2.84 -> 15.5%). Methodology working as designed, not throttled.
+Raising the vol target to reach Rob's headline vol is a BAD TRADE: 20->26% target gets vol ~19% but Sharpe
+0.92->0.86, maxDD -47->-75 (nearly doubles), skew worse. Best risk-adjusted point = BASE (EXP2 ties).
+FINAL: leave target 20% + cap 2.5. 15.2%/0.92 is the system being correct. Gap fully closed & benign.
+Scripts: gap_experiments.py (+ private/gap_experiments.csv/.log).
