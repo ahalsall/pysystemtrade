@@ -422,3 +422,31 @@ OPERATIONAL NOTES for production: always run production processes with TZ=UTC (o
 
 ### CSI setup STARTED (2026-07-01)
 Ingester built + validated: sysinit/futures/csi_pipeline.py (CSI_CONFIG FINAL="Close", CSI_SYMBOL_MAP CSI-sym->PST, --rename <CSISYM>_<YYYYMM>.csv -> Day_<PST>_<YYYYMM00>.csv, reuses split-freq loader + roll/multiple/adjusted). Validated on sample CSI data (AE->AEX parsed 259 daily rows). PERMISSION MODEL: raw CSI lands in private/data/futures/csi/ (owned by `csi` user, read-only to andrew); ingester stages renamed files to private/data/futures/csi_ingest/ (andrew-writable). VM/shared-folder + UA export guide: notes/concepts/csi_setup_guide.md. TODO: full CSI_SYMBOL_MAP for universe (verify spellings e.g. ALUMINIUM), confirm UA export header/date format, pick shared-folder mechanism (Samba recommended), nightly cron (respect barchart_process_exclude separation), deep-backfill seasonals to fix rolls. Also: build-out catch-up run kicked this morning (background, protected by barchart_process_exclude); nightly cron intact.
+
+### ✅ VOL/SHARPE GAP vs ROB — FULLY AUDITED & CLOSED (2026-07-11)
+Question: why does our rob_system deploy ~15.2% vol / SR 0.92 vs Rob AFTS Table128 (~18.8-21.1% vol, SR 1.06-1.22)?
+Method: corrected fractional decomposition (sysinit/futures/gap_decomposition.py) + scaling audit (scaling_diagnostic.py).
+CORRECTION found first: futures_system() from rob_system INCLUDES optimisedPositions (it's the dynamic-opt system),
+so the earlier "unrounded ceiling" (rounding_decomposition.py) was actually dynamic-opt@$500k — coincidentally 15.2%,
+matching the TRUE fractional (Account stage, no optimiser), so that conclusion held by luck. Note added to that file.
+
+FINDINGS (fractional, 20% target, 106 instruments):
+- V0 full rob_system: 15.2%/SR0.92 FULL; 15.9%/1.05 on 1996-2021; V3 trend+carry+atten: 16.8%/0.94 FULL, 17.5%/1.05 96-21.
+- Vol attenuation HELPS (remove it -> SR 0.92->0.75). Keep it. NOT the culprit.
+- Relative-value/skew rules dampen vol ~1.5pt at ~neutral SR (they ADD diversification the capped IDM can't monetize).
+- Scaling audit: avg |combined forecast| 9.3/10 (FULL strength, not weak); avg SUBSYSTEM vol 23.2% (>target, per-inst fine);
+  IDM last 2.50 = AT dm_max cap 2.5 (mean 2.27); portfolio/subsystem vol ratio = 0.66.
+
+VERDICT (both benign):
+1. SHARPE gap = PERIOD. On 1996-2021 (Rob's era) we hit SR 1.05 ~= his 1.06. Full-period 0.92 dragged by 2022-26 drought
+   (post-dates his book). No defect.
+2. VOL gap = IDM CAP (2.5) on a highly-diversified book. NOT weak forecasts, NOT bad scaling — every instrument
+   over-deploys alone (23.2%); the 106-instrument book is so diversified the "correct" IDM would be ~3.8 but is capped
+   at 2.5 to protect against correlation breakdown in crises. The lower vol is a DELIBERATE, PRUDENT risk control = GOOD.
+   The relative-value-rule dampening is the SAME mechanism (more diversification than the cap will lever).
+
+LEVERS if higher realized vol wanted (small-account absolute return): raise the vol TARGET (not the cap) — realized vol
+scales ~linearly with target while IDM cap + attenuation stay intact/protective; target ~26% -> ~20% realized. Removing/
+raising the IDM cap is the WRONG lever (reintroduces the correlation-breakdown tail risk the cap exists to prevent).
+RECOMMENDATION: leave it. Risk-adjusted return (Sharpe) is what compounds and it matches Rob. 15.2% = system being prudent.
+Scripts: gap_decomposition.py, scaling_diagnostic.py (+ private/scaling_diagnostic.csv, private/gap_decomp.log).

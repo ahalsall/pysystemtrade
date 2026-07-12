@@ -1,4 +1,12 @@
 """Isolate how much of the vol shortfall is CONTRACT ROUNDING vs everything else.
+
+CORRECTION (see gap_decomposition.py): futures_system() from rob_system ALREADY includes
+optimisedPositions (it's the DYNAMIC-OPT system), so the "unrounded reference" computed below
+is NOT truly fractional -- it's the dynamic-opt book at $500k. The number (15.2%) happened to
+coincide with the TRUE fractional ceiling (gap_decomposition V0, standard Account stage, also
+15.2%), so the conclusion held by luck. For the correct fractional ceiling use
+gap_decomposition.py (Account stage, no optimiser). Retained here for provenance.
+
 The standard rob_system holds FRACTIONAL positions (no integer constraint) -> its realized
 vol is the 'achievable without rounding' ceiling, capital-invariant. Compared against the
 dynamic-opt (integer) realized vol from the saved capital sweep, the difference = rounding
