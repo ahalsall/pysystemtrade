@@ -711,3 +711,18 @@ ACTION (user): add CSI symbol HUC (HKEX USD/CNH) to UA export. THEN (me): ingest
   the CNH inverse row from private/data/futures/csi_price_scale.csv (HKEX not inverted); re-ingest + verify
   ib_csi_calibration CNH ~ratio 1.0 with deep history + real volume; re-run liquidity_screen (should PASS).
 Alternative if HUC unavailable: keep CNH research-only (thin) or drop from live universe.
+
+### UNIVERSE ALIGNMENT AUDIT status (2026-07-13) — 3/4 dimensions clean; variant/venue pass recommended
+Q: are we confident in liquidity + contract size + right-instrument across UA(CSI) and IB for the whole universe?
+CLEARED:
+ - PRICE/SCALE: full 106 IB calibration sweep clean (only MSCIWORLD+CNH needed fixing, both done).
+ - CONTRACT-SIZE config integrity: Pointsize x priceMagnifier == IBMultiplier for ALL 122; config ccy == IB ccy
+   for all; every instrument has an IB mapping. (stock config, consistent by construction.)
+ - LIQUIDITY (re-run post scale-fix, clean risk-$): 102/106 PASS Rob thresholds (>=100 contracts & >=$1.5M risk).
+   FAILs: CNH ($1.39M, being replaced by HKEX), BONO/CH10 (already in excluded export-gap 28), STEEL (336 contracts
+   $0.65M risk = genuine live-vs-research flag, healthy otherwise). SILVER etc now sane post scale-fix.
+REMAINING GAP: VARIANT/VENUE correctness -- NOT systematically verified. MSCIWORLD (NETR vs price) & CNH (CME vs
+ SGX) prove these hide when config is consistent + notional in-band + prices coincidentally align. Recommend a
+ UA<->IB variant/venue audit: per instrument compare CSI catalog (commodityfactsheet.csv via csi_symbol_map: Name,
+ Exchange, ContractSize, Units, Currency) vs IB reqContractDetails (longName, exchange, multiplier, currency);
+ flag underlying/venue/size mismatches. Needs Gateway (~15min). This is the definitive closer before live.
