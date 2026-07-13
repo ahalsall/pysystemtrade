@@ -530,3 +530,23 @@ Re-ran reconciliation preview -> "none (broker == DB)". 8 breaks -> 0. Gap fixed
 REMAINING: run full-universe sampling (fix_contract_expiries.py with no args -> all multiple-prices instruments)
 so the whole Phase C tradeable universe is reconcilable; deferred until the IB recorder finishes (avoid concurrent
 IB pacing). This is also part of the normal daily run_daily_fx_and_contract_updates process.
+
+### ROLL-CALENDAR CLEANUP — ROOT-CAUSED (2026-07-13); comprehensive audit
+Ran sysinit/futures/roll_calendar_audit.py (read-only) over the 106 universe -> private/roll_calendar_audit.csv.
+Findings:
+ - "104 truncated" flag was SPURIOUS: audit read the SEED calendars in data/futures/roll_calendars_csv/ (stale 2021);
+   the CSI pipeline writes real calendars to private/data/futures/roll_calendars_csv/. Multiple prices (the sim source)
+   are current for the healthy set. Ignore the truncation flag.
+ - SOYMEAL (#26): RESOLVED. priced 20260900 / carry 20260800 -> carry computable; NOT stale; the -90->-45 RollOffset
+   change did NOT break carry. 0 CARRY=PRICE across the whole universe. Close #26.
+ - 30 STALE instruments (= Phase A REVIEW set, = task #28 cluster): multiple prices stuck on an EXPIRED priced
+   contract (e.g. EU-BANKS priced 20260600 whose data ended 2026-06-19 -> PRICE NaN for ~3 weeks; Sep 20260900 has
+   current data but sits as forward). ROOT CAUSE (definitive): these 30 have their LAST contract = 20260900 (Sep) and
+   NO Dec-2026+ contract. pysystemtrade priced = SECOND-TO-LAST contract, so with data ending at Sep the priced is
+   stuck at Jun. Healthy instruments run far forward (BUND->Dec26, AUD->Sep27, JPY->Dec27). Staged CSI files for the
+   30 end at Day_<sym>_20260900.csv -> the CSI EXPORT only went out to Sep. NOT fixable by rebuild (tested EU-BANKS:
+   no Jun->Sep roll can generate without a Dec forward). FIX = CSI RE-EXPORT of the 30 with deeper forward coverage
+   (>= Dec-2026 + Mar-2027), then re-ingest via csi_pipeline. List: private/stale_reexport_list.txt (PST->CSI syms).
+ - Interim: the 30 stay in the Phase A REVIEW set, EXCLUDED from Phase C's 74-READY paper universe until re-exported.
+Scripts: roll_calendar_audit.py, rebuild_stale_rolls.py (rebuild-only driver; confirmed rebuild alone can't fix the
+ coverage gap). EU-BANKS was test-rebuilt (harmless; same stale state, will be fixed by re-export).
