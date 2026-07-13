@@ -502,3 +502,19 @@ IB INTRADAY RECORDER (task #31, sysinit/futures/ib_intraday_capture.py): siloed 
  (asserts != sim path). Reuses IB client get_prices_at_frequency_for_contract_object at Frequency.Hour; merges per
  contract; 10s pacing sleep. DRY-RUN default (validated: 74 instruments mapped to current contracts, isolation OK);
  IB_LIVE=1 with Gateway up to fetch. intraday_frequency default in pysystemtrade = H (hourly). TODO: live Gateway test.
+
+### IB GATEWAY WIRING VALIDATED (2026-07-13, off-hours) — recorder works, reconciliation gap found
+Gateway up (paper DU1739659, port 4002). Ran read-only preliminary checks (sysinit/futures/ib_preliminary_checks.py):
+ - CONNECTION OK (client id 104, market-data farms OK). Paper account value ~$1.27M base ccy.
+ - 4 STALE OPEN POSITIONS from the 2026-07-01 fill still live: JPY -1 (20260914), AUD -1 (20260914),
+   SP500_micro +1 (20260918), GOLD_micro -1 (20260827). Flatten or manage in the first Phase C cycle.
+ - 8 POSITION BREAKS (broker vs DB) = EXPIRY-MAPPING GAP: broker reports exact expiries (YYYYMMDD) but DB holds
+   month-codes (YYYYMM00) and the current contracts' expiry dates aren't populated in the CSI-rebuilt DB
+   ("expiry not found in database"). => PHASE C PREREQUISITE: populate current-contract expiries (contract
+   sampling / update_sampled_contracts) so broker<->DB reconciliation matches cleanly. Not a data-corruption
+   issue; the CSI rebuild just didn't carry IB exact expiries for the current front contracts.
+
+IB INTRADAY RECORDER LIVE-VALIDATED (task #31): CAPTURE_LIMIT=3 IB_LIVE=1 fetched hourly bars (AEX 307,
+ ALUMINIUM 160, AUD 160) and wrote to the SILOED store private/data/parquet_ib_intraday/ (Hour@<inst>#<contract>.parquet);
+ sim store untouched. Recorder wiring done; remaining = schedule as background daily append + EOD-close cross-check.
+ Fixes: class parquetFuturesContractPriceData, futuresContract(inst,date), CAPTURE_LIMIT env.
