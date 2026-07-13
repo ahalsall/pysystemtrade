@@ -623,3 +623,23 @@ IMPACT: %vol scale-invariant -> fractional backtest ~ok; but integer optimizer n
   mis-size these 4 (JPY/COTTON at 100x notional -> round to ~0 contracts -> effectively dropped). FIX before live.
 NEXT: IB cross-check (Gateway up) to confirm real prices, then fix per-instrument (priceMagnifier in ib_config /
   Pointsize in instrumentconfig / csi_symbol_map). Part of task #32.
+
+### SCALE BUGS FIXED via coordinating price-scale config (2026-07-13); 3/4 done, CNH pending IB
+Root cause (verified): pysystemtrade stored price must satisfy stored = real_price x priceMagnifier (since
+Pointsize = IBMultiplier/priceMagnifier). CSI quotes some instruments in cents/x100 while their stock Pointsize
+expects the base unit -> notional 100x off. Confirmed: CORN(mag100,Pointsize50,cents) OK; COTTON/SILVER/JPY
+(mag1, dollar-Pointsize) got cents from CSI -> 100x. BUND fine (CSI gives natural). Not a config we changed (git:
+stock Pointsizes). So it's a CSI-convention mismatch -> needs a per-instrument CSI scale config (user's insight).
+SOLUTION: private/data/futures/csi_price_scale.csv (instrument,scale,reason) -- COTTON/SILVER/JPY = 0.01. Applied
+at INGEST via ConfigCsvFuturesPrices.apply_multiplier (scales OPEN/HIGH/LOW/FINAL only, NOT volume). Wired into
+BOTH csi_pipeline.csi_config_for() (single source of truth) and csi_sync_reingest (imports it) so daily syncs +
+full rebuilds stay correct. VERIFIED (no Gateway needed, notional self-check): COTTON front 78.67->0.7802
+notional $3.9M->$39,010; SILVER/JPY re-ingested; scale_audit flagged 11->8 (COTTON/SILVER/JPY cleared; remaining
+= CNH + 7 false-positives STIR/short-bond low-vol + V2X small-notional which are CORRECT).
+CNH DEFERRED: notional $2,041 (~50x too LOW), FX convention ambiguous (SGX USD/CNH, possible inversion) -> do NOT
+guess; calibrate vs IB. Gateway was DOWN this session (port 4002 refused) so couldn't calibrate CNH or IB-verify.
+TOOL for when Gateway up: sysinit/futures/ib_csi_calibration.py -- fetches IB daily close+volume per contract,
+compares to CSI (price_ratio -> the scale correction; volume_ratio = the requested IB-vs-CSI volume check). Run it
+on CNH + a full-universe sweep to catch any unflagged small-notional 100x errors + confirm COTTON/SILVER/JPY.
+Note: %vol is scale-invariant so the fractional backtest was always ~unaffected; this fixes integer-optimizer
+notional/rounding + live order sizing. Task #32 tracks the remainder.

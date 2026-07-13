@@ -23,7 +23,7 @@ import csv as _csv
 
 from syscore.fileutils import get_resolved_pathname
 from sysinit.futures.csi_pipeline import (
-    CSI_CONFIG, CSI_HEADER, DEFAULT_ROLL_CALENDAR_PATH,
+    CSI_CONFIG, CSI_HEADER, DEFAULT_ROLL_CALENDAR_PATH, PRICE_SCALE, csi_config_for as _config_for,
     init_db_with_split_freq_csv_prices_for_code, build_and_write_roll_calendar,
     process_multiple_prices_single_instrument, process_adjusted_prices_single_instrument,
     _dedupe_roll_calendar_csv,
@@ -127,7 +127,7 @@ def reingest(pst):
         print(f"  {pst} ({csi_sym}): no raw files in {UA_DIR}", flush=True); return False
     staged = stage(pst, csi_sym)
     init_db_with_split_freq_csv_prices_for_code(pst, get_resolved_pathname("private.data.futures.csi_ingest"),
-                                                csv_config=CSI_CONFIG)
+                                                csv_config=_config_for(pst))
     build_and_write_roll_calendar(pst, output_datapath=RCP, write=True, check_before_writing=False)
     _dedupe_roll_calendar_csv(pst, RCP)
     process_multiple_prices_single_instrument(pst, csv_roll_data_path=RCP, ADD_TO_DB=True, ADD_TO_CSV=False)

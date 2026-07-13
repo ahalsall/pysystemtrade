@@ -164,12 +164,35 @@ def rename_csi_exports(export_dir: str, target_datapath: str, symbol_map: dict =
         print(f"  no CSI_SYMBOL_MAP entry for (skipped): {sorted(set(skipped))}")
 
 
+import csv as _csv_mod
+def _load_price_scale():
+    """Coordinating CSI price-scale config: per-instrument multiplier applied at INGEST so stored
+    price matches pysystemtrade's convention (stored = real_price x priceMagnifier). CSI quotes
+    some instruments in cents/x100 while their Pointsize expects the base unit -> notional 100x off.
+    Single source of truth used by BOTH run_pipeline and csi_sync_reingest. Calibrate entries vs IB."""
+    fp = "private/data/futures/csi_price_scale.csv"
+    if not os.path.exists(fp):
+        return {}
+    return {r["instrument"]: float(r["scale"]) for r in _csv_mod.DictReader(open(fp))}
+PRICE_SCALE = _load_price_scale()
+
+
+def csi_config_for(code):
+    scale = PRICE_SCALE.get(code, 1.0)
+    if scale == 1.0:
+        return CSI_CONFIG
+    return ConfigCsvFuturesPrices(
+        input_date_index_name="Time", input_skiprows=0, input_skipfooter=0, input_date_format="%Y-%m-%d",
+        input_column_mapping=dict(OPEN="Open", HIGH="High", LOW="Low", FINAL="Close", VOLUME="Volume"),
+        apply_multiplier=scale)
+
+
 def run_pipeline(instruments, datapath, roll_calendar_path):
     ok, fail = [], []
     for code in instruments:
         print("=" * 60, f"\nProcessing {code}")
         try:
-            init_db_with_split_freq_csv_prices_for_code(code, datapath, csv_config=CSI_CONFIG)
+            init_db_with_split_freq_csv_prices_for_code(code, datapath, csv_config=csi_config_for(code))
             build_and_write_roll_calendar(code, output_datapath=roll_calendar_path,
                                           write=True, check_before_writing=False)
             _dedupe_roll_calendar_csv(code, roll_calendar_path)
