@@ -744,3 +744,15 @@ BENIGN: JPY/SILVER/COTTON point-value = the cents/x100 conventions already fixed
  correct); NIFTY (NSE<->SGX GIFT migration) + COTTON venue (ICE<->NYMEX IB naming) almost certainly same product.
 CONCLUSION: answered the user's Q -- we were NOT fully confident; the audit surfaced ~5 genuine variant/venue
  issues (esp FTSEINDO wrong-index, DAX point-value) that scale/contract-size/liquidity/price checks all passed.
+
+### FTSEINDO + DAX resolved (2026-07-13, from variant/venue audit)
+DAX: NOT a bug -- confirmed FINE. pysystemtrade sets the IB contract multiplier from config (ib_instruments.py:92),
+ so our IBMultiplier=1 resolves DAX to FDXS = MICRO-DAX (EUR1/pt, ~EUR25k notional). Verified: IB multiplier=1 ->
+ tradingClass FDXS only; multiplier=25 -> FDAX (full). Micro-DAX is right for our capital; CSI DAX-index data serves
+ it (same index all sizes). The audit POINTVAL(25 vs 1) flag is a FALSE POSITIVE for deliberately-smaller contracts.
+ -> POINTVAL flag class is unreliable when we trade micro/mini vs the catalog's full-size point value.
+FTSEINDO: DROPPED (unfixable + marginal). CSI data (MIN) = MSCI Indonesia (EUREX, thin, catalog LastVol 130) but
+ ib_config (WIIDN/SGX) = FTSE Indonesia -> signal on one index, execution on another = wrong exposure. IB FTSE
+ Indonesia (WIIDN) vol ~50/day = FAILS 100-contract floor; IB MSCI Indonesia (MID/HKFE) doesn't resolve to a
+ tradeable contract. No liquid aligned option either way. REMOVED FTSEINDO row (MIN,FTSEINDO) from csi_symbol_map.csv
+ -> excluded from universe (parquet data remains, unselected; reversible via git). Universe now 1 fewer.
