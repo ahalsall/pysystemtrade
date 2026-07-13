@@ -661,3 +661,17 @@ NOTE: CNH CSI data is THIN (only 3 contract files, IB vol 103k vs CSI 631) -> fl
  but the scale/direction is now correct. Full-universe IB calibration sweep launched (private/ib_calibration_full.log)
  to catch any unflagged residuals + the IB-vs-CSI volume consistency check (contract choice caveat: uses forward
  contract which is far-dated/thin, so volume ratios there are not apples-to-apples for liquidity).
+
+### FULL-UNIVERSE IB CALIBRATION SWEEP done (2026-07-13) — universe clean except MSCIWORLD
+ib_csi_calibration.py swept all 106 vs IB (private/ib_calibration_full.log / ib_csi_calibration.csv).
+COTTON/SILVER/JPY/CNH all now OK vs IB (CNH 6.7527 vs 6.7561 ratio 1.0005 = inversion fix confirmed). Only ONE
+genuine scale discrepancy remains across the whole universe: MSCIWORLD CSI 16010 vs IB 4935 (ratio 0.308, ~3.24x).
+NOT a clean 100x (so not the cents pattern) AND IB's compared contract (20261200) had 0 volume -> IB price may be a
+stale/thin-contract quote. DO NOT auto-fix -> verify against a LIQUID MSCIWORLD contract (real MSCI World index
+~3900; 16010/4~4000 hints CSI may be a x4 or different-denomination variant). Added to task #32.
+Benign (5-11% price/date diffs, NOT scale bugs): BRENT-LAST 1.07, GASOILINE 1.06, HEATOIL 1.065, KOSPI_mini 0.90.
+VOLUME check caveat: sweep used the forward contract (often far-dated/thin on IB) so CSI_vol vs IB_vol isn't
+apples-to-apples for liquidity EXCEPT it flagged CNH as thin in CSI (631 vs IB 103k). A proper vol-consistency pass
+should compare the FRONT liquid contract.
+NET: 4/4 original scale bugs fixed + IB-confirmed; zero remaining ~100x errors; MSCIWORLD (3.24x) + CNH-thinness are
+the only open data-quality items.
