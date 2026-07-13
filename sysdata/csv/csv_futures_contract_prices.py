@@ -101,7 +101,8 @@ class csvFuturesContractPriceData(futuresContractPriceData):
             column_series = instrpricedata[col_name]
             if inverse:
                 column_series = 1 / column_series
-            column_series *= multiplier
+            column_series = column_series * multiplier
+            instrpricedata[col_name] = column_series  # assign back (inverse rebinds -> must write)
 
         instrpricedata = futuresContractPrices(instrpricedata)
 

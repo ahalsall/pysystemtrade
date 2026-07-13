@@ -173,18 +173,23 @@ def _load_price_scale():
     fp = "private/data/futures/csi_price_scale.csv"
     if not os.path.exists(fp):
         return {}
-    return {r["instrument"]: float(r["scale"]) for r in _csv_mod.DictReader(open(fp))}
+    out = {}
+    for r in _csv_mod.DictReader(open(fp)):
+        out[r["instrument"]] = dict(
+            scale=float(r.get("scale") or 1.0),
+            inverse=str(r.get("inverse", "0")).strip() in ("1", "True", "true"))
+    return out
 PRICE_SCALE = _load_price_scale()
 
 
 def csi_config_for(code):
-    scale = PRICE_SCALE.get(code, 1.0)
-    if scale == 1.0:
+    cfg = PRICE_SCALE.get(code)
+    if not cfg or (cfg["scale"] == 1.0 and not cfg["inverse"]):
         return CSI_CONFIG
     return ConfigCsvFuturesPrices(
         input_date_index_name="Time", input_skiprows=0, input_skipfooter=0, input_date_format="%Y-%m-%d",
         input_column_mapping=dict(OPEN="Open", HIGH="High", LOW="Low", FINAL="Close", VOLUME="Volume"),
-        apply_multiplier=scale)
+        apply_multiplier=cfg["scale"], apply_inverse=cfg["inverse"])
 
 
 def run_pipeline(instruments, datapath, roll_calendar_path):

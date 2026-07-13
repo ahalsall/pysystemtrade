@@ -643,3 +643,21 @@ compares to CSI (price_ratio -> the scale correction; volume_ratio = the request
 on CNH + a full-universe sweep to catch any unflagged small-notional 100x errors + confirm COTTON/SILVER/JPY.
 Note: %vol is scale-invariant so the fractional backtest was always ~unaffected; this fixes integer-optimizer
 notional/rounding + live order sizing. Task #32 tracks the remainder.
+
+### ALL 4 SCALE BUGS FIXED + IB-CONFIRMED (2026-07-13, Gateway up)
+Ran ib_csi_calibration.py (fetches IB daily close+vol per contract vs CSI). CONFIRMED the 3 prior fixes against
+IB ground truth: COTTON CSI 0.8154 = IB 0.8154; SILVER 60.83 ~ IB 58.38; JPY 0.0063 ~ IB 0.0062 (all px_ratio ~1.0);
+controls CORN/WHEAT/SUGAR/BUND/SP500_micro all match. So the coordinating-config approach is validated end-to-end.
+CNH RESOLVED: CSI 0.1481 vs IB 6.7562 = pure INVERSION (CSI quotes USD-per-CNH; IB/pysystemtrade want CNH-per-USD).
+ Inversion also fixes CNH's RETURN DIRECTION (was sign-flipped), not just notional. Fixed via apply_inverse.
+ BUT found + fixed a REAL pysystemtrade BUG: sysdata/csv/csv_futures_contract_prices.py apply_inverse rebound
+ column_series without writing back (line ~102) -> inversion was silently a no-op. Fixed (assign back to
+ instrpricedata[col_name]; also makes apply_multiplier robust). CNH now: price 0.148->6.7527, notional 2041->$93,071.
+Coordinating config now has scale+inverse columns: private/data/futures/csi_price_scale.csv
+ COTTON/SILVER/JPY scale 0.01; CNH inverse. Applied at ingest via csi_pipeline.csi_config_for (used by both
+ full rebuild + daily sync). scale_audit: 11->7 flagged, all 7 remaining are FALSE POSITIVES (STIR/short-bond
+ <2% vol = correct: FED/EURIBOR/SOFR/US2/BTP3/SHATZ; V2X small notional = correct vol future). ZERO real scale bugs.
+NOTE: CNH CSI data is THIN (only 3 contract files, IB vol 103k vs CSI 631) -> flag for liquidity/coverage review,
+ but the scale/direction is now correct. Full-universe IB calibration sweep launched (private/ib_calibration_full.log)
+ to catch any unflagged residuals + the IB-vs-CSI volume consistency check (contract choice caveat: uses forward
+ contract which is far-dated/thin, so volume ratios there are not apples-to-apples for liquidity).
