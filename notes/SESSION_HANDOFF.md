@@ -726,3 +726,21 @@ REMAINING GAP: VARIANT/VENUE correctness -- NOT systematically verified. MSCIWOR
  UA<->IB variant/venue audit: per instrument compare CSI catalog (commodityfactsheet.csv via csi_symbol_map: Name,
  Exchange, ContractSize, Units, Currency) vs IB reqContractDetails (longName, exchange, multiplier, currency);
  flag underlying/venue/size mismatches. Needs Gateway (~15min). This is the definitive closer before live.
+
+### VARIANT/VENUE AUDIT done (2026-07-13) — found real issues; audit was worth it
+sysinit/futures/variant_venue_audit.py: per-instrument CSI catalog (commodityfactsheet.csv via csi_symbol_map)
+vs IB reqContractDetails. 122 instruments, 14 real flags (after CBT=CBOT false-positive fix). -> private/variant_venue_audit.csv
+GENUINE ISSUES (decisions/fixes needed):
+ - FTSEINDO: WRONG INDEX -- CSI=MSCI Indonesia(EUREX), IB=FTSE Indonesia(SGX). Different index+venue. HIGH PRIORITY.
+ - DAX: POINTVAL csi 25 vs cfg 1 -- CSI=full DAX(EUR25/pt), config Pointsize=1(micro EUR1/pt). Same index so returns
+   fine but notional/sizing 25x off unless we deliberately trade micro-DAX. CONFIRM (major instrument).
+ - FTSECHINAH: CSI "FTSE China 50"(CME) vs IB "FTSE China H50"(SGX). venue + maybe different index. REVIEW.
+ - EURIBOR: CSI ICE vs IB EUREX (same 3M rate, diff exchange). align venue.
+ - BRENT-LAST: CSI CLEAR(ICE) vs IB NYMEX (two different Brent-last listings). REVIEW.
+ - CNH: CME/SGX + size 500k/100k -> already being replaced by HKEX (task #33).
+CAN'T VERIFY (CSI symbol not in commodityfactsheet.csv): FTSECHINAA, FTSETAIWAN, IRON, MSCISING (all SGX) -> check
+ csi_symbol_map vs catalog SymbolUA (maybe different catalog vintage).
+BENIGN: JPY/SILVER/COTTON point-value = the cents/x100 conventions already fixed via csi_price_scale (notionals
+ correct); NIFTY (NSE<->SGX GIFT migration) + COTTON venue (ICE<->NYMEX IB naming) almost certainly same product.
+CONCLUSION: answered the user's Q -- we were NOT fully confident; the audit surfaced ~5 genuine variant/venue
+ issues (esp FTSEINDO wrong-index, DAX point-value) that scale/contract-size/liquidity/price checks all passed.
