@@ -54,14 +54,23 @@ def stats(label, target, dm_max):
     idm = system.portfolio.get_instrument_diversification_multiplier()
     raw = p.as_ts
     raw = raw() if callable(raw) else raw
+    # NOTE: .percent returns are ALREADY in percent units (0.5% day -> 0.5), so NO extra x100.
     r = pd.Series(raw).replace([np.inf, -np.inf], np.nan).dropna()
+    # persist the daily return path so future DD/stat questions don't need a rebuild
+    os.makedirs("private/gap_curves", exist_ok=True)
+    r.to_csv(f"private/gap_curves/{label.split()[0]}.csv", header=["daily_pct_return"])
     def sr(x): return x.mean() / x.std() * np.sqrt(256)
+    # additive (arithmetic) DD = pysystemtrade native: cumsum of % returns minus running peak
     dd = (r.cumsum() - r.cumsum().cummax())
+    # compounded (geometric) DD = peak-to-trough of the reinvested equity curve, bounded at -100%
+    eq = (1.0 + r / 100.0).cumprod()
+    cdd = (eq / eq.cummax() - 1.0) * 100.0
     out = dict(
         label=label, target=target, dm_max=dm_max,
-        ann_ret=r.mean() * 256 * 100, vol=r.std() * np.sqrt(256) * 100, sharpe=sr(r),
-        maxDD=float(dd.min()) * 100, timeInDD=float((dd < 0).mean()) * 100, skew=float(r.skew()),
-        sr9621=sr(r.loc[:"2021-12-31"]), vol9621=r.loc[:"2021-12-31"].std() * np.sqrt(256) * 100,
+        ann_ret=r.mean() * 256, vol=r.std() * np.sqrt(256), sharpe=sr(r),
+        maxDD=float(dd.min()), compDD=float(cdd.min()), timeInDD=float((dd < 0).mean()) * 100,
+        skew=float(r.skew()), sr9621=sr(r.loc[:"2021-12-31"]),
+        vol9621=r.loc[:"2021-12-31"].std() * np.sqrt(256),
         idm_last=float(idm.iloc[-1]), idm_mean=float(idm.mean()))
     print(f"  {label:<24} done: vol {out['vol']:.1f}% SR {out['sharpe']:.2f} IDM {out['idm_last']:.2f}", flush=True)
     return out
@@ -73,14 +82,16 @@ rows = [stats("BASE 20% / cap 2.5", 20.0, 2.5),
         stats("EXP2 20% / NO cap", 20.0, 100.0),
         stats("EXP3 26% / NO cap", 26.0, 100.0)]
 df = pd.DataFrame(rows)
-print("\n" + "=" * 104)
-print(f"{'scenario':<22}{'vol%':>7}{'annRet%':>9}{'Sharpe':>8}{'maxDD%':>8}{'inDD%':>7}{'skew':>7}"
-      f"{'IDMlast':>9}{'SR9621':>8}{'vol9621':>9}")
-print("-" * 104)
+print("\n" + "=" * 112)
+print(f"{'scenario':<22}{'vol%':>7}{'annRet%':>9}{'Sharpe':>8}{'addDD%':>8}{'compDD%':>9}{'inDD%':>7}"
+      f"{'skew':>7}{'IDM':>6}{'SR9621':>8}")
+print("-" * 112)
 for _, x in df.iterrows():
     print(f"{x['label']:<22}{x['vol']:>7.1f}{x['ann_ret']:>9.1f}{x['sharpe']:>8.2f}{x['maxDD']:>8.1f}"
-          f"{x['timeInDD']:>7.0f}{x['skew']:>7.2f}{x['idm_last']:>9.2f}{x['sr9621']:>8.2f}{x['vol9621']:>9.1f}")
-print("=" * 104)
-print("Rob AFTS Table128 ref: ~18.8-21.1% vol, SR 1.06-1.22. maxDD/inDD are on cumulative % return path.", flush=True)
+          f"{x['compDD']:>9.1f}{x['timeInDD']:>7.0f}{x['skew']:>7.2f}{x['idm_last']:>6.2f}{x['sr9621']:>8.2f}")
+print("=" * 112)
+print("addDD = additive/arithmetic DD (pysystemtrade native, cumulative %-return path); "
+      "compDD = compounded equity DD (bounded -100%).", flush=True)
+print("Rob AFTS Table128 ref: ~18.8-21.1% vol, SR 1.06-1.22.", flush=True)
 df.to_csv("private/gap_experiments.csv", index=False)
 print("saved -> private/gap_experiments.csv", flush=True)
