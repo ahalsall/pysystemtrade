@@ -608,3 +608,18 @@ integer optimizer notional/rounding + any live $-sizing are distorted for mis-sc
 private/liquidity_screen.csv.
 NOTE the CarryOffset question (thin-deferred carry) is downstream of this: once scales are trusted + the risk screen
 runs clean, decide live-vs-research membership and which survivors need CarryOffset=-1.
+
+### SCALE AUDIT first pass (2026-07-13, sysinit/futures/scale_audit.py) — 4 real scale bugs found
+Computes front-contract price, implied notional (price x USD point size), annual %vol per instrument; flags
+notional outside $3k-$600k or vol outside 2-90%. -> private/scale_audit.csv. 11 flagged = 4 REAL + 7 false-pos.
+REAL scale bugs (all unit-convention mismatches; confirm vs IB then fix config/mapping):
+  SILVER  notional $6.02M  (price 6016 vs real ~$36/oz)      ~33x
+  JPY     notional $7.77M  (per-yen vs per-100-yen)          ~100x
+  COTTON  notional $4.08M  (cents vs dollars)                ~100x
+  CNH     notional $2,041  (deflated)                        ~50x low
+FALSE POSITIVES (correct, heuristic bands too tight): FED/EURIBOR/SOFR/US2/BTP3/SHATZ (STIR/short-bond <2% vol is
+  real); V2X (vol future legit small notional). US-TECH/SP400 sane (not scale-broken).
+IMPACT: %vol scale-invariant -> fractional backtest ~ok; but integer optimizer notional/rounding + live order sizing
+  mis-size these 4 (JPY/COTTON at 100x notional -> round to ~0 contracts -> effectively dropped). FIX before live.
+NEXT: IB cross-check (Gateway up) to confirm real prices, then fix per-instrument (priceMagnifier in ib_config /
+  Pointsize in instrumentconfig / csi_symbol_map). Part of task #32.
