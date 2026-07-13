@@ -472,3 +472,33 @@ Raising the vol target to reach Rob's headline vol is a BAD TRADE: 20->26% targe
 0.92->0.86, real (compounded) DD -38.8%->-54.6%, skew worse. Best risk-adjusted point = BASE (EXP2 ties).
 FINAL: leave target 20% + cap 2.5. 15.2%/0.92 is the system being correct. Gap fully closed & benign.
 Scripts: gap_experiments.py (+ private/gap_experiments.csv/.log).
+
+### PRODUCTION TRACK #30 STARTED (2026-07-12); decisions: $250k/20% paper, IB intraday recorder in parallel
+Beta production paper trading of CSI-driven rob_dynamic. Two user decisions this session:
+ - Paper run capital/vol: $250k / 20% vol (middle ground: exercises a good chunk of the universe, our validated vol target).
+ - IB intraday capture: stand up a minimal siloed recorder NOW in parallel (perishable tape argument).
+
+PHASE A instrument-alignment audit DONE (sysinit/futures/phase_a_instrument_audit.py -> private/phase_a_audit.csv):
+ 106 CSI-universe instruments; 0 BLOCKED (ALL have IB contract mappings + specs -> whole universe IB-tradeable).
+ 74 READY; 32 REVIEW = ~30 flagged STALE(-1mo) (quarterly EU/US sector indices + Euro bonds; roll-calendar/rebuild
+ timing, SAME cluster as task #28) + 2 false positives (EURIBOR/SOFR forward-dating is normal for STIR futures).
+ Currency mix 67 USD/25 EUR/rest CHF/JPY/KRW/CNH/SGD -> from CAD base every trade has an FX leg.
+ Phase A follow-up: rebuild-and-recheck the ~30 -1mo instruments (also closes #28); whitelist EURIBOR/SOFR.
+
+PHASE B backtest at $250k/20% RUNNING (CAPITALS=250000 VOL_TARGET=20 dynopt_capital_sweep -> capsweep_vt20_250000/
+ {stats.json, positions.parquet, attribution}). Validates production integer position sizing at our capital.
+Next: Phase C paper fills (order gen -> stack handler, liquid window, TZ=UTC); Phase D daily automation + reconciliation.
+
+PROD INFRA MAP (from Explore): strategy=rob_dynamic; run_systems -> optimal positions (Mongo);
+ run_strategy_order_generator (orderGeneratorForDynamicPositions) -> instrument orders; run_stack_handler ->
+ broker orders + fills; config gen = sysinit/futures/make_rob_dynamic_config.py -> private/systems/rob_dynamic/config.yaml.
+ 2026-07-01 paper fill used a 10-subset at $500k/25% on shallow IB-seeded data; now we have CSI deep history.
+ ISOLATION: run_systems reads only parquet sim stores; IB fills -> Mongo positions, NOT price stores. The one
+ contamination vector = seeding scripts (IB/barchart) writing into the sim parquet -> keep disabled. NOTE:
+ pysystemtrade's native run_daily_prices_updates fetches IB intraday INTO the sim contract-price store -> do NOT
+ run it under CSI-only; our recorder writes to a SEPARATE store instead.
+
+IB INTRADAY RECORDER (task #31, sysinit/futures/ib_intraday_capture.py): siloed store private/data/parquet_ib_intraday/
+ (asserts != sim path). Reuses IB client get_prices_at_frequency_for_contract_object at Frequency.Hour; merges per
+ contract; 10s pacing sleep. DRY-RUN default (validated: 74 instruments mapped to current contracts, isolation OK);
+ IB_LIVE=1 with Gateway up to fetch. intraday_frequency default in pysystemtrade = H (hourly). TODO: live Gateway test.
