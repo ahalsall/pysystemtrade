@@ -675,3 +675,14 @@ apples-to-apples for liquidity EXCEPT it flagged CNH as thin in CSI (631 vs IB 1
 should compare the FRONT liquid contract.
 NET: 4/4 original scale bugs fixed + IB-confirmed; zero remaining ~100x errors; MSCIWORLD (3.24x) + CNH-thinness are
 the only open data-quality items.
+
+### MSCIWORLD verified vs LIQUID contract (2026-07-13) — index-VARIANT mismatch, NOT a scale bug
+Compared CSI vs IB on the liquid Sep contract (CSI vol 13,696): ratio consistently 0.308 (same as Dec) -> not a
+contract artifact. DIAGNOSIS: CSI MSCIWORLD ~15,835 = MSCI World NET TOTAL RETURN index; IB MXWO ~4,879 = MSCI World
+PRICE index (what our config points to: MXWO/EUREX/mult10). 3.24x ratio ~= 56yr compounded dividends (both base 100
+Dec-1969, ~2%/yr) -> confirms TR-vs-price, NOT a units error. A scale multiplier would be WRONG (ratio drifts with
+dividends). Price RETURNS of TR vs price futures are ~identical -> backtest signal ~unaffected; but notional (158k vs
+49k), carry, and the tradeable contract differ. DECISION NEEDED (instrument-config, not a patch): (a) remap CSI to
+the PRICE-index MSCI World future to match IB MXWO, OR (b) repoint config/IB symbol to the Net-TR future if that's
+what's liquid/tradeable for us. NB CSI vol 13,696 >> IB MXWO vol 188 -> TR variant may be the liquid one; check which
+MSCI World future actually fills at IB. Left UNCHANGED pending that decision. Task #32.
