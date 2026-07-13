@@ -697,3 +697,17 @@ MSCIWORLD IBSymbol MXWO -> M1WO (EUREX/USD/mult10/mag1/IgnoreWeekly TRUE keeps q
 Pointsize 10 already correct for NETR level (notional ~$160k). VERIFIED: ib_csi_calibration MSCIWORLD now
 CSI 16010 = IB 16010, ratio 1.0000 OK. Backtest was already on NETR (CSI data) so this aligns execution to it.
 => All scale-audit items now resolved. Only residual: CNH thin in CSI (coverage), scale correct.
+
+### CNH REPLACEMENT PLAN (2026-07-13) — switch to HKEX USD/CNH (deep CSI + liquid IB, same exposure)
+Root of CNH thinness: our CSI symbol CY = CME "Chinese Renminbi (Offshore)", StartDate 2026-02-23 (brand new, 3
+contracts, vol ~360). AND venue mismatch: data=CME(CY) but ib_config executes SGX(UC). CSI has NO SGX USD/CNH.
+BEST REPLACEMENT (same offshore USD/CNH exposure) = HKEX USD/CNH, which CSI carries deep + IB has liquid:
+  CSI catalog: HUC (HKEX USD/CNH Combined, start 2014-12, LastVol 92,150) or HCU (RTH, start 2013-02, 88,388).
+  IB: CNH-HK = CNH/HKFE mult 100000 -> ~1,563/day (passes liquidity screen ~$9M/day risk). (SGX UC is most liquid
+  at ~25k/day but CSI has NO SGX CNH data, so can't use it.) HKEX quotes CNH-per-USD (6.77) = right convention,
+  NO inversion needed (unlike CME CY which we patched with apply_inverse).
+ACTION (user): add CSI symbol HUC (HKEX USD/CNH) to UA export. THEN (me): ingest HUC; repoint csi_symbol_map
+  HUC->CNH (replacing CY->CNH); repoint ib_config CNH row to CNH,CNH,HKFE,CNH,100000,1,FALSE (from UC/SGX); REMOVE
+  the CNH inverse row from private/data/futures/csi_price_scale.csv (HKEX not inverted); re-ingest + verify
+  ib_csi_calibration CNH ~ratio 1.0 with deep history + real volume; re-run liquidity_screen (should PASS).
+Alternative if HUC unavailable: keep CNH research-only (thin) or drop from live universe.
