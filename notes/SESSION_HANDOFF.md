@@ -575,3 +575,20 @@ PHASE B RESULT (capsweep_vt20_250000): $250k/20% -> Sharpe 0.84, ann 11.5%, REAL
  $250k vs 15.2% fractional), maxDD -32.0%, avg DD -10.0%, skew -0.24, funded 91/106, held-today 14. Production sizing
  validated at our capital. (Ran on all 106 incl the stale-tailed 28; ~3wk NaN tail negligible over 30y — rerun on
  the 78 healthy after the refresh for a clean Phase C baseline.)
+
+### 4-HOUR CHECK (2026-07-13 03:23 PDT) — Dec forward contracts did NOT arrive; diagnosed
+Healthy-universe sync refresh: DONE 78/78, sim DB now current to 2026-07-10 (verified BUND/SP500_micro/BOBL).
+The 28 sector indices: the UA re-build DID run on them this time (fresh mtimes Jul 12 22:53 - Jul 13 00:33, vs old
+Jul 6-7) BUT still produce NO contract beyond Sep-2026 (202609). So NOT a portfolio-membership problem.
+DIAGNOSIS = CSI contract-activation timing, not a fixable export setting:
+ - Control BOBL(EBM) Dec-2026 (202612) got its FIRST data row only 2026-07-09 (1 row) -> Dec-2026 quarterly
+   contracts are only just now activating.
+ - Thin sector indices activate deferred contracts LATE: DEB(EU-BANKS) Sep contract's first data was 2026-03-23
+   (~5.5mo lead); extrapolating, DEB's Dec likely won't have data until ~Sep-2026.
+ => CSI genuinely has no Dec-2026 data for these 28 yet, so pysystemtrade can't roll them (priced=second-to-last
+    needs a Dec forward). They can't be fixed until CSI's Dec contract activates (likely weeks).
+ACTION: none ingestible now. The 28 stay EXCLUDED from Phase C's healthy universe. Re-run
+ `csi_sync_reingest.py --diff` after a future CSI download to auto-detect when Dec arrives (shows as NEW-CONTRACT).
+USER TO OPTIONALLY CONFIRM on CSI side: does the factsheet for e.g. DEB list a Dec-2026 contract at all? If listed
+ but empty = data lag (wait); if not listed = exchange hasn't activated the deferred sector-index quarter yet.
+Healthy universe for Phase C = 78 (106 - 28). Consider rerunning Phase B on the clean 78 for a Phase-C baseline.
