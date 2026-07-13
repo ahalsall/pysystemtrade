@@ -686,3 +686,14 @@ dividends). Price RETURNS of TR vs price futures are ~identical -> backtest sign
 the PRICE-index MSCI World future to match IB MXWO, OR (b) repoint config/IB symbol to the Net-TR future if that's
 what's liquid/tradeable for us. NB CSI vol 13,696 >> IB MXWO vol 188 -> TR variant may be the liquid one; check which
 MSCI World future actually fills at IB. Left UNCHANGED pending that decision. Task #32.
+
+### MSCIWORLD RESOLVED (2026-07-13) — repointed IB symbol to the liquid NETR future (M1WO)
+Queried IB (reqMatchingSymbols/reqContractDetails). Two USD MSCI World quarterly futures on EUREX:
+  M1WO (FMWO) = MSCI World NETR (Net Total Return) USD, px ~15,740, mult 10, quarterly vol ~4,644/day
+  MXWO (FMWP) = MSCI World PRICE index USD, px ~4,879, mult 10, quarterly vol ~209/day  <- our OLD config (thin!)
+CSI's MSCIWORLD data (~15,835) = the NETR future, and NETR is ~22x more liquid. So it was never a scale bug --
+our ib_config just pointed at the wrong (thin price-index) symbol. FIX (one field): ib_config_futures.csv
+MSCIWORLD IBSymbol MXWO -> M1WO (EUREX/USD/mult10/mag1/IgnoreWeekly TRUE keeps quarterly, skips daily TRF).
+Pointsize 10 already correct for NETR level (notional ~$160k). VERIFIED: ib_csi_calibration MSCIWORLD now
+CSI 16010 = IB 16010, ratio 1.0000 OK. Backtest was already on NETR (CSI data) so this aligns execution to it.
+=> All scale-audit items now resolved. Only residual: CNH thin in CSI (coverage), scale correct.
