@@ -550,3 +550,28 @@ Findings:
  - Interim: the 30 stay in the Phase A REVIEW set, EXCLUDED from Phase C's 74-READY paper universe until re-exported.
 Scripts: roll_calendar_audit.py, rebuild_stale_rolls.py (rebuild-only driver; confirmed rebuild alone can't fix the
  coverage gap). EU-BANKS was test-rebuilt (harmless; same stale state, will be fixed by re-export).
+
+### CSI STALE ROLLS: ingest-gap vs export-gap SPLIT + daily sync workflow (2026-07-13)
+The 30 stale instruments split into two causes (checked raw UA export UA/Data/PST/<CSISYM>_<YYYYMM>.csv vs staged/DB):
+ - INGEST-GAP (2): BOBL(EBM), KR10(KT0) — raw HAD the Dec-2026 contract (202612); we'd only STAGED to Sep (202609).
+   FIXED by re-ingest -> now priced 20260900 / fwd 20261200, data current to 07-10. (MUMMY, LIVECOW also auto-synced.)
+ - EXPORT-GAP (28): raw UA itself stops at Sep-2026 (202609) though DATA is fresh to 2026-07-10 — just no Dec forward.
+   pysystemtrade priced = SECOND-TO-LAST contract, so no Dec -> stuck on expired June. All EU/US SECTOR INDICES +
+   peripheral bonds: BON BTS CON SCP DJA DEB DJS DED DEW DJH DJI DJE DJV JPX RSV SEK ESM EMD SPD SPE SPF SPH SPI SPM
+   SPR SPS SPT SPU. USER TO CHECK in UA: why these sector-index symbols don't list the Dec-2026+ contract (forward-
+   months/deferred setting, or CSI doesn't carry the deferred quarter for these yet). Then re-export -> csi_sync_reingest.
+
+DAILY SYNC WORKFLOW (sysinit/futures/csi_sync_reingest.py) — the ongoing CSI->sim maintenance tool:
+  --diff : per-instrument compare raw export vs parquet DB on 2 triggers: NEW-CONTRACT (raw front > DB) and
+           NEW-ROWS (raw data date > DB adjusted last date). Ran it: 143 instruments behind (most just 07-07->07-10
+           = whole DB 3 days stale; a few deeply-stale non-universe: BRE ends 2000, EPRA-EUROPE 2010, BOVESPA 2023).
+  <codes>: stage changed raw -> re-ingest contract prices -> rebuild roll calendar/multiple/adjusted -> validate.
+  --auto : diff then re-ingest the flagged set.
+ Efficiency TODO (deferred by user): mtime pre-filter (only diff raw files changed since last sync) + incremental
+ append for NEW-ROWS. Current tool mirrors production's nightly full rebuild; correct but ~1-2min diff + ~10s/inst.
+ RAN NOW: sync refresh on the 78 HEALTHY instruments (106 universe minus 28 export-gap) to bring sim to 07-10.
+
+PHASE B RESULT (capsweep_vt20_250000): $250k/20% -> Sharpe 0.84, ann 11.5%, REALIZED vol 13.6% (integer rounding at
+ $250k vs 15.2% fractional), maxDD -32.0%, avg DD -10.0%, skew -0.24, funded 91/106, held-today 14. Production sizing
+ validated at our capital. (Ran on all 106 incl the stale-tailed 28; ~3wk NaN tail negligible over 30y — rerun on
+ the 78 healthy after the refresh for a clean Phase C baseline.)
