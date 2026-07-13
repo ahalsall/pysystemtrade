@@ -518,3 +518,15 @@ IB INTRADAY RECORDER LIVE-VALIDATED (task #31): CAPTURE_LIMIT=3 IB_LIVE=1 fetche
  ALUMINIUM 160, AUD 160) and wrote to the SILOED store private/data/parquet_ib_intraday/ (Hour@<inst>#<contract>.parquet);
  sim store untouched. Recorder wiring done; remaining = schedule as background daily append + EOD-close cross-check.
  Fixes: class parquetFuturesContractPriceData, futuresContract(inst,date), CAPTURE_LIMIT env.
+
+### EXPIRY-MAPPING RECONCILIATION GAP FIXED (2026-07-13, off-hours)
+Root cause understood: reconciliation calls get_actual_expiry(instrument, contract_date) against the mongo CONTRACT
+db; the CSI-rebuilt db had the current contracts unsampled (no IB expiry) -> ContractNotFound -> phantom break.
+Fix = contract sampling (sysinit/futures/fix_contract_expiries.py, non-interactive wrapper of
+update_active_contracts_for_instrument; writes ONLY to the contract db, never prices/sim). Gateway up.
+Validated on the 4 open-position instruments (SP500_micro GOLD_micro JPY AUD): sampling pulled real IB expiries
+(e.g. SP500_micro/20260900 -> 2026-09-18 = broker's 20260918; expired June contracts auto-retired from sampling).
+Re-ran reconciliation preview -> "none (broker == DB)". 8 breaks -> 0. Gap fixed.
+REMAINING: run full-universe sampling (fix_contract_expiries.py with no args -> all multiple-prices instruments)
+so the whole Phase C tradeable universe is reconcilable; deferred until the IB recorder finishes (avoid concurrent
+IB pacing). This is also part of the normal daily run_daily_fx_and_contract_updates process.
