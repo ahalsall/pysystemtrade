@@ -774,3 +774,15 @@ BRENT-LAST: NO ACTION. CSI BZN symbol=BZ (exch labeled CLEAR) = IB BZ/NYMEX = sa
 NET: variant/venue audit fully worked through. Real fixes: FTSEINDO dropped, EURIBOR->ICE. DAX confirmed fine.
  Everything else benign. Only CNH->HKEX remains (task #33, awaiting HUC export). Universe alignment now COMPLETE
  across scale, contract-size, liquidity, and variant/venue.
+
+### CNH -> HKEX USD/CNH DONE (2026-07-13) — task #33 complete
+HUC exported (53 contracts, 2014-2027, deep). Executed the switch:
+ - csi_symbol_map: CY(CME) -> HUC (HKEX USD/CNH deep).
+ - ib_config: CNH,UC,SGX -> CNH,CNH,HKFE (execute HKEX, the venue matching the data).
+ - csi_price_scale: REMOVED the CNH inverse row (HUC quotes CNY/USD ~6.53, already correct convention).
+ - Cleared old CME-CY data (3 staged + parquet contract/multiple/adjusted) then re-ingested HUC clean.
+VERIFIED: ib_csi_calibration CNH ratio 1.0000 (CSI 6.7077 = IB 6.7077, both HKEX, no inversion); 53 contracts
+ 20141200..20271200; front px 6.5708 notional ~$90,565; adj fresh to 2026-07-13. CNH now coherent: deep HKEX data
+ + liquid HKEX execution + right convention + correct notional. Old thin/mismatched CME-CY (3 contracts, inverted)
+ fully replaced. This closes the last data-alignment item -> universe fully aligned across scale/size/liquidity/
+ variant-venue with CNH now a proper live instrument.
