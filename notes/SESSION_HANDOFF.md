@@ -756,3 +756,21 @@ FTSEINDO: DROPPED (unfixable + marginal). CSI data (MIN) = MSCI Indonesia (EUREX
  Indonesia (WIIDN) vol ~50/day = FAILS 100-contract floor; IB MSCI Indonesia (MID/HKFE) doesn't resolve to a
  tradeable contract. No liquid aligned option either way. REMOVED FTSEINDO row (MIN,FTSEINDO) from csi_symbol_map.csv
  -> excluded from universe (parquet data remains, unselected; reversible via git). Universe now 1 fewer.
+
+### Remaining variant/venue items RESOLVED (2026-07-13) — audit complete
+INDONESIA: no viable exposure exists. Only tradeable Indonesia future = SGX FTSE Indonesia (WIIDN) ~50/day (fails
+ liquidity); IB MSCI Indonesia (MID/HKFE, EUREX) not tradeable. Single-country Indonesia equity futures inherently
+ too thin -> FTSEINDO drop is FINAL; Indonesia only reachable indirectly via broad EM/Asia index if wanted.
+EURIBOR: FIXED. Our config pointed to EUREX EURIBOR (EU3) which trades ~5-200/day (effectively dead); the liquid
+ EURIBOR is ICE (I/ICEEU, ~5k-25k/day), which is ALSO CSI's data venue (FEI=ICE-EU-FIN). Same rate (px_ratio .999),
+ same multiplier 2500. Repointed ib_config EURIBOR EU3/EUREX -> I/ICEEU. Verified: resolves to ICE, IB_vol 25,211,
+ ratio 0.9991 OK. Now execution+data both ICE + liquid.
+FTSECHINAH: NO ACTION. Same index (FTSE China 50 = H50); SGX execution (XIN0I) liquid ~2,054/day. CME(CSI data
+ source) vs SGX(execution) is same index, prices align (sweep didn't flag). Low risk.
+BRENT-LAST: NO ACTION. CSI BZN symbol=BZ (exch labeled CLEAR) = IB BZ/NYMEX = same NYMEX Brent-Last contract;
+ 8% price diff is a thin far-month date artifact, not instrument mismatch.
+4 NO-CATALOG (FTSECHINAA/FTSETAIWAN/IRON/MSCISING, all SGX): commodityfactsheet.csv just lacks these SymbolUA rows
+ (incomplete catalog); full price sweep already matched them to IB (ratio ~1.0) -> correct instruments, no action.
+NET: variant/venue audit fully worked through. Real fixes: FTSEINDO dropped, EURIBOR->ICE. DAX confirmed fine.
+ Everything else benign. Only CNH->HKEX remains (task #33, awaiting HUC export). Universe alignment now COMPLETE
+ across scale, contract-size, liquidity, and variant/venue.
