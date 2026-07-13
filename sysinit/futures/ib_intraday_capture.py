@@ -38,6 +38,9 @@ def load_universe():
 
 dp = diagPrices()
 universe = load_universe()
+_limit = os.environ.get("CAPTURE_LIMIT")
+if _limit:
+    universe = universe[:int(_limit)]
 
 # current priced contract per instrument (from sim multiple prices) = the liquid contract to record
 plan = []
@@ -65,19 +68,19 @@ if not IB_LIVE:
 from syscore.dateutils import Frequency
 from sysobjects.contracts import futuresContract
 from sysdata.parquet.parquet_access import ParquetAccess
-from sysdata.parquet.parquet_futures_per_contract_prices import parquetFuturesPerContractPricesData
+from sysdata.parquet.parquet_futures_per_contract_prices import parquetFuturesContractPriceData
 from sysproduction.data.broker import dataBroker
 
 freq = getattr(Frequency, FREQ_NAME)
 os.makedirs(SILOED_PATH, exist_ok=True)
-siloed = parquetFuturesPerContractPricesData(ParquetAccess(SILOED_PATH))
+siloed = parquetFuturesContractPriceData(ParquetAccess(SILOED_PATH))
 broker = dataBroker()
 ok = fail = 0
 for c, ct in plan:
     if ct.startswith("ERR"):
         fail += 1; continue
     try:
-        contract = futuresContract.from_two_strings(c, ct)
+        contract = futuresContract(c, ct)
         bars = broker.get_prices_at_frequency_for_contract_object(contract, freq)
         if bars is None or len(bars) == 0:
             print(f"  {c} {ct}: no bars"); fail += 1; continue
