@@ -592,3 +592,19 @@ ACTION: none ingestible now. The 28 stay EXCLUDED from Phase C's healthy univers
 USER TO OPTIONALLY CONFIRM on CSI side: does the factsheet for e.g. DEB list a Dec-2026 contract at all? If listed
  but empty = data lag (wait); if not listed = exchange hasn't activated the deferred sector-index quarter yet.
 Healthy universe for Phase C = 78 (106 - 28). Consider rerunning Phase B on the clean 78 for a Phase-C baseline.
+
+### LIQUIDITY SCREEN built + run (2026-07-13) — reliable on volume, blocked on risk-$ by data-scale bug
+sysinit/futures/liquidity_screen.py uses pysystemtrade's OWN thresholds (constants.py): PASS = >=100 contracts/day
+AND >=$1.5M/day RISK (risk_$m = daily_price_stdev x sqrt(256) x point_size_base x avg_daily_contracts /1e6).
+Fixed a volume bug first: best_vol must scan CURRENTLY-LIQUID contracts (front +/-window), not cds[-5:] which for
+deep forward curves are far-dated illiquid contracts (made SILVER look like 7 lots/day etc).
+RESULT (contracts/day = RELIABLE): 104/106 clear >=100 lots; only BONO(47) & CH10(28) fail, both already-excluded
+export-gap. So raw liquidity across the tradeable universe is fine (incl US-TECH once volume fixed).
+RESULT (risk-$ = NOT TRUSTWORTHY): corrupted by CSI PRICE-SCALE BUGS. SILVER contract price=6016.50 vs real ~$36/oz
+(~167x inflated -> risk $117,387M/day absurd); CNH looks deflated ($47/contract). GOLD_micro/PALLAD/PLAT/BUND/MES
+are correct. => risk-$ FAILs (STEEL, CNH, +stale) are a mix of real + corrupted; can't certify until scales fixed.
+-> Task #32: CSI data-scale audit + IB cross-check. Impact: %vol is scale-invariant (fractional backtest ~ok) but
+integer optimizer notional/rounding + any live $-sizing are distorted for mis-scaled instruments. Screen output:
+private/liquidity_screen.csv.
+NOTE the CarryOffset question (thin-deferred carry) is downstream of this: once scales are trusted + the risk screen
+runs clean, decide live-vs-research membership and which survivors need CarryOffset=-1.
