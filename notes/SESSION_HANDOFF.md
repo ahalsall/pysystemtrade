@@ -800,3 +800,19 @@ THEN (me, automatic): csi_sync_reingest --diff flags NEW-CONTRACT -> re-ingest -
 BOBL/KR10) -> 28 rejoin healthy universe. No code change, just the data.
 STRATEGIC: several of the 28 are thin (US-TECH ~940/day; BONO/CH10 fail liquidity screen) -> decide live-worthy vs
 research-only before investing in their forward data. Separate from the data fix.
+
+### 28-SECTOR GAP root cause REFINED (2026-07-13): CSI per-market deferred-collection, not UA settings
+User noted UA date-range is portfolio-wide -> can't explain per-market differences. Evidence resolves it:
+forward-contract depth in the raw CSI export varies BY MARKET, not by UA setting:
+  CORN(C2): 14 forward contracts, Dec-2026 back to 2022 (deep). BOBL(EBM): 2 forward, Dec-2026 only 2 rows
+  STARTED 2026-07-09 (NOT back-filled though IB has it since Apr). Sector indices (DEB/DEW/EMD/JPX): 1 (front only).
+=> CSI (the vendor) decides how many deferred contracts to carry PER MARKET, on a cadence tied to each deferred
+contract's activity/OI. UA can only export what CSI's DB has. CSI hasn't started collecting the sector indices'
+Dec-2026 yet. Catalog fields identical (same IIV quarterly DM, end 2026-07-06, dayOI=0) incl for liquid EBM, and
+DEB isn't even thin (lastVol 74,517) -> confirms it's CSI collection cadence, not a config/liquidity threshold we set.
+OPTIONS: (1) UA check: is DEB Dec-2026 LISTED-but-not-downloaded (=UA count setting, raise it) or not-listed
+(=CSI doesn't have it, evidence says this). (2) WAIT: as Sep front nears expiry (~mid-Sep) CSI collects Dec (like
+BOBL ~2mo ahead) -> csi_sync_reingest --diff auto-folds them. (3) CONTACT CSI SUPPORT to extend deferred-contract
+collection for these markets (the real lever). (4) No workaround our side (pysystemtrade needs a forward to roll +
+carry needs 2 contracts). STRATEGIC: prioritize the viable ones (EU-BANKS 74k, SP400 10k); the thin ones (DEW 123,
+US-TECH 314, JPX 1938) are research-only regardless -> not worth chasing forward data for.
