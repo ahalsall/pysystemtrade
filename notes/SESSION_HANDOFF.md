@@ -786,3 +786,17 @@ VERIFIED: ib_csi_calibration CNH ratio 1.0000 (CSI 6.7077 = IB 6.7077, both HKEX
  + liquid HKEX execution + right convention + correct notional. Old thin/mismatched CME-CY (3 contracts, inverted)
  fully replaced. This closes the last data-alignment item -> universe fully aligned across scale/size/liquidity/
  variant-venue with CNH now a proper live instrument.
+
+### 28 SECTOR-INDEX GAP: diagnosed as UA export config, NOT contract timing (2026-07-13)
+Re-checked: all 28 still export only to Sep-2026 (202609) even after fresh 07-13 downloads. IB check settles it:
+the Dec-2026 (+Mar-2027, +more) contracts EXIST and are LISTED for all of them (EU-BANKS/SX7E, US-TECH/SIXT,
+SP400/EMD, EU-OIL/SXEP, US-ENERGY/IXE -- Sep26/Dec26/Mar27 all listed; CME ones out to Sep-2027), AND HAVE DATA:
+IB shows 60-63 daily settlement bars back to ~2026-04-15 for the Dec-2026 contract (recent vol ~0 = deferred/thin,
+but pysystemtrade only needs price data to roll, not volume). => The gap is CSI/UA not EXPORTING the deferred
+contracts for these 28 symbols (only pulling the front), NOT the exchange/timing.
+WHAT WE NEED: in Unfair Advantage, increase the number of forward/deferred contracts (delivery months) downloaded
+for these 28 symbols (>= Dec-2026 + Mar-2027). They have deep history but the forward extent is capped at the front.
+THEN (me, automatic): csi_sync_reingest --diff flags NEW-CONTRACT -> re-ingest -> roll advances Jun->Sep (like
+BOBL/KR10) -> 28 rejoin healthy universe. No code change, just the data.
+STRATEGIC: several of the 28 are thin (US-TECH ~940/day; BONO/CH10 fail liquidity screen) -> decide live-worthy vs
+research-only before investing in their forward data. Separate from the data fix.
