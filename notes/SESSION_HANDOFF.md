@@ -816,3 +816,14 @@ BOBL ~2mo ahead) -> csi_sync_reingest --diff auto-folds them. (3) CONTACT CSI SU
 collection for these markets (the real lever). (4) No workaround our side (pysystemtrade needs a forward to roll +
 carry needs 2 contracts). STRATEGIC: prioritize the viable ones (EU-BANKS 74k, SP400 10k); the thin ones (DEW 123,
 US-TECH 314, JPX 1938) are research-only regardless -> not worth chasing forward data for.
+
+### 28-sector gap: the IB deferred "data" is SETTLEMENT-ONLY, not traded (2026-07-13 clarification)
+Verified: EU-BANKS Dec-2026 has 0 volume EVERY day but a daily close that tracks Sep ~1.4pt below in lockstep =
+exchange daily SETTLEMENT (derived fair-value mark = Sep - carry/dividend spread), NOT real trades / price discovery.
+Implications: (1) validates CSI's policy of not collecting a contract until it actually trades (settlement-only
+marks aren't real prices; BOBL Dec appeared in CSI ~07-09 when bond rollers started trading it). (2) WEAKENS the IB
+bridge idea -- bridging would import synthetic settlement marks CSI deliberately excludes. (3) we're not missing
+real info -- Dec settlement is derived from the Sep price we already have; the only thing the contract buys is
+roll-mechanics (a 'forward' to advance the priced) + a ~1.4pt cost-of-carry. So no data-quality urgency, only roll.
+DECISION LEAN: let CSI collect these as they start trading (~Sep roll) or ask CSI; do NOT bridge settlement-only
+prices from IB. Only pursue live-viable ones (EU-BANKS 74k, SP400 10k); thin ones research-only.
