@@ -827,3 +827,16 @@ real info -- Dec settlement is derived from the Sep price we already have; the o
 roll-mechanics (a 'forward' to advance the priced) + a ~1.4pt cost-of-carry. So no data-quality urgency, only roll.
 DECISION LEAN: let CSI collect these as they start trading (~Sep roll) or ask CSI; do NOT bridge settlement-only
 prices from IB. Only pursue live-viable ones (EU-BANKS 74k, SP400 10k); thin ones research-only.
+
+### CARRY on settlement-only-deferred instruments (2026-07-13) — model-derived, not market
+The 28 sector indices use CarryOffset=+1 (carry contract = the deferred). Since the deferred never trades
+(settlement-only), carry = liquid_front - settlement_deferred = the EXCHANGE'S modeled cost-of-carry (tautological),
+NOT a market-discovered term structure. NOT garbage though: for equity indices carry IS dividends-minus-financing,
+and settlement is built from real dividend/rate inputs (EU-BANKS Sep-Dec ~1.4pt = ~1.9%/yr = real bank-dividend
+carry). What's LOST = market microstructure / term-structure pressure (part of carry's edge) + it's smooth/slow.
+CarryOffset can't fix it: only ONE contract is ever liquid, so no liquid adjacent pair exists at any time to measure
+a market carry (= the 'only-front-liquid' case). IMPLICATIONS: treat these as TREND-PRIMARY; consider down-weighting
+carry for this subset (it's ~11% of the blend; settlement carry adds little independent info) -- a deliberate
+strategy tweak, flag for user decision. pysystemtrade computes carry blindly from prices -> produces a smooth carry
+forecast unaware it's modeled (acceptable if understood as a dividend proxy). SCOPE: only thin single-liquid-contract
+instruments; liquid ones with traded deferred chains (CORN 14 fwd, bonds, major indices) have real market carry.
