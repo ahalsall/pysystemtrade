@@ -840,3 +840,17 @@ carry for this subset (it's ~11% of the blend; settlement carry adds little inde
 strategy tweak, flag for user decision. pysystemtrade computes carry blindly from prices -> produces a smooth carry
 forecast unaware it's modeled (acceptable if understood as a dividend proxy). SCOPE: only thin single-liquid-contract
 instruments; liquid ones with traded deferred chains (CORN 14 fwd, bonds, major indices) have real market carry.
+
+### DECISIONS on carry + forwards + IB-fork (2026-07-13)
+1. CARRY WEIGHTING: LEAVE AS ROB HAS IT. Rob studied equity-index carry (dividend/term-structure) in depth; his
+   forecast weights already embed how he handles model-derived/weak carry. No down-weighting. Do not alter.
+2. FORWARD CONTRACTS: needed for the ROLL (advance priced off expired Jun), NOT for carry. Settlement-only data is
+   adequate for roll mechanics. BUT self-resolving: CSI collects the Dec contract as the Sep front nears expiry &
+   starts trading (like BOBL ~2mo early) -> csi_sync_reingest --diff auto-folds them. => No urgent action; only fill
+   actively if we want these live in the next few weeks (they're thin/trend-primary -> waiting is fine).
+3. IB-FORK PATTERN: user's dual-stream idea (canonical pure-CSI backup + separate CSI+IB-augmented working store that
+   production reads, splices documented & auto-replaced when CSI catches up) = SOUND safety pattern, mirrors siloed
+   intraday recorder. RESERVED for genuine need (a LIQUID stuck instrument, or intraday IB blend). NOT invoked for the
+   28: they self-resolve at the roll + the IB forward data is settlement-only (the synthetic marks CSI excludes) ->
+   would take a single-source exception for lower-quality data. Poor trade.
+DECISION: keep 28 excluded/research-only until Sep roll; sim stays clean CSI-only; bank the fork pattern for later.
