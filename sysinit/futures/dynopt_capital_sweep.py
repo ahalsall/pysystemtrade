@@ -33,14 +33,19 @@ csi = set(r[1] for r in csv.reader(open("private/data/futures/csi_symbol_map.csv
 cfg_inst = set(Config("systems.provided.rob_system.config.yaml").instrument_weights.keys())
 data = dbFuturesSimData()  # reused across capitals (prices cached)
 cands = csi & data_inst & cfg_inst
+# Tradeability = the CURRENT PRICED CONTRACT has current data (multiple-prices PRICE last-real date).
+# This catches dead instruments AND roll-stuck ones (e.g. the 28 sector indices whose adjusted price
+# extends via forward-fill but whose priced contract expired) -- get_raw_price/adjusted would miss the latter.
 last = {}
 for c in cands:
     try:
-        last[c] = pd.Timestamp(data.get_raw_price(c).dropna().index[-1].date())
+        mp = dp.db_futures_multiple_prices_data.get_multiple_prices(c)
+        last[c] = pd.Timestamp(mp["PRICE"].dropna().index[-1].date())
     except Exception:
         last[c] = pd.Timestamp("1900-01-01")
 fresh = max(last.values())
-our = sorted(c for c in cands if (fresh - last[c]).days <= 45)
+STALE_DAYS = int(os.environ.get("STALE_DAYS", 15))  # priced-contract data age; 15 excludes stuck-roll instruments
+our = sorted(c for c in cands if (fresh - last[c]).days <= STALE_DAYS)
 w = 1.0 / len(our)
 pidx = load_pst_index()
 CAPITALS = [float(x) for x in os.environ.get("CAPITALS", "110000,300000,500000,1000000").split(",")]
