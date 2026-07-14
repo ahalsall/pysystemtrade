@@ -854,3 +854,18 @@ instruments; liquid ones with traded deferred chains (CORN 14 fwd, bonds, major 
    28: they self-resolve at the roll + the IB forward data is settlement-only (the synthetic marks CSI excludes) ->
    would take a single-source exception for lower-quality data. Poor trade.
 DECISION: keep 28 excluded/research-only until Sep roll; sim stays clean CSI-only; bank the fork pattern for later.
+
+### PRODUCTION TRACK #30 RESUMED (2026-07-13) — refreshed backtest on aligned universe
+Universe fully aligned/cleaned since the old Phase B: 4 scale bugs fixed, CNH->HKEX, MSCIWORLD->NETR,
+EURIBOR->ICE, FTSEINDO dropped, data refreshed. So re-running the production backtest on the current TRADEABLE
+universe. Selection fix (dynopt_capital_sweep): tradeability = PRICED CONTRACT current (multiple-prices PRICE
+last-real date <= STALE_DAYS 15), which excludes the 28 roll-stuck sector indices (adjusted extends via
+forward-fill but priced contract expired) + dead instruments -> 78 clean tradeable instruments.
+RUNNING: CAPITALS=250000 VOL_TARGET=20 STALE_DAYS=15 dynopt_capital_sweep -> capsweep_vt20_250000 (updated positions
++ stats on the 78). Gateway is UP.
+NEXT (Phase C paper fills, needs Gateway + LIQUID WINDOW ~13:00-20:00 UTC weekday, Read-Only OFF, no competing IB
+session, TZ=UTC): (1) make_rob_dynamic_config on the 78 tradeable -> private/systems/rob_dynamic/config.yaml;
+(2) run_systems -> optimal positions to Mongo; (3) run_strategy_order_generator -> instrument orders; (4)
+run_stack_handler (continuous) -> broker orders -> paper fills; (5) reconcile fills vs sim targets. Also: 4 stale
+paper positions from 2026-07-01 (JPY/AUD/SP500_micro/GOLD_micro) to flatten or fold into the first cycle;
+expiry-mapping reconciliation was fixed for those. QA audit (#25) still stands before any live money.
