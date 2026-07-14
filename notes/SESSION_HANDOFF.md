@@ -892,3 +892,26 @@ kept; AUD/GOLD_micro/SP500_micro flatten; rest open to target. INSPECTION ONLY -
 READY for Phase C fills: next liquid window (~13:00-20:00 UTC weekday) + user at Gateway (Read-Only OFF, no competing
 IB session, TZ=UTC) -> make_rob_dynamic_config (done) -> run_systems -> run_strategy_order_generator ->
 run_stack_handler (continuous) -> paper fills -> reconcile. QA audit (#25) before real money.
+
+### ROLL-STUCK ROOT CAUSE FOUND + FIXED (2026-07-14) — batch roll-calendar generation drops last row
+ACCOUNTABILITY: I built a BATCH roll-calendar pipeline (csi_pipeline loops build_and_write_roll_calendar) which
+data.md line 271 explicitly warns against ("careful craftsmanship, not suited to a batch process"), then
+mis-diagnosed the symptom for multiple turns ("can't trade without Dec / priced=second-to-last is architectural")
+when the real mechanism was in the docs the whole time. User pushed back twice before I read data.md properly.
+ROOT CAUSE: build_roll_calendars.adjust_to_price_series (line ~196) DROPS the last row of the approximate calendar,
+so the generated calendar ends one roll early -> priced = SECOND-TO-LAST contract. Harmless with a deep forward
+chain (CORN has 14); for instruments whose data ends at the current front, it strands the priced on the EXPIRED
+contract -> multiple-prices PRICE goes NaN, adjusted freezes flat (forward-filled), forecasts stale. Docs (line 263)
+say to manually ADD the recent roll that batch generation drops. Production never hits this (incremental roll).
+FIX: sysinit/futures/fix_stuck_rolls.py appends the missing roll (current=stuck priced, next=current front, roll
+date snapped into the current+next price overlap), rebuilds multiple+adjusted. NO Dec/forward needed -- the FRONT
+becomes priced, live prices flow into forecasts. Ran on 47 auto-detected stuck -> UNIVERSE 78 -> 106 TRADEABLE.
+The 28 sector indices now priced=20260900 (Sep), PRICE fresh to 07-07, adjusted VARYING (not flat). Carry mostly
+NaN (forward=Dec missing) -> down-weighted, fine. VALIDATED per-instrument (roll-window continuity): 27/28 clean
+(3-6x typical June moves, no jumps); US-TECH flagged 10x = a real June-5 market move NOT a roll jump, but its
+Jun/Sep overlap is only 8 days (thin) -> genuine individual-care case, acceptable but fragile.
+CORRECTIVE / GO-FORWARD: (1) batch roll generation is the wrong model -- move toward Rob's PRODUCTION incremental
+roll (update_multiple_prices / roll status) which never drops rolls; (2) gate any batch roll build behind a
+per-instrument continuity + roll-date review (the validation above); (3) read all project docs end-to-end (data.md
+done; backtesting/production/instruments/IB next). (4) 15 still-stale = genuinely dead (BOVESPA/EU-TECH/etc), separate.
+NOTE: universe is now 106 -> the Phase C production config + order inspection (were on 78) should be RE-RUN on 106.
