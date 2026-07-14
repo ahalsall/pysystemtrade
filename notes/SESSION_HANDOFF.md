@@ -881,3 +881,14 @@ RUNNING: sysinit/futures/inspect_orders.py (CAPITAL=250000 VOL_TARGET=20) builds
 NOTE it's 02:50 UTC (outside liquid window) -> this is prep only; actual paper FILLS wait for a liquid window
  (~13:00-20:00 UTC weekday) with user present (Read-Only OFF, no competing IB session, TZ=UTC). 4 stale 2026-07-01
  paper positions (JPY/AUD/SP500_micro/GOLD_micro) will net against the target book in the implied orders.
+
+### PHASE C ORDER INSPECTION done (2026-07-13) — target book + orders validated, READY
+Built rob_dynamic production system @ $250k/20% on 78 tradeable (Rob's fitted weights). "All zeros in optimisation"
+= 3 benign historical periods (not the final book). TARGET BOOK (16 held / 78, gross ~20 contracts -- sparse due to
+integer rounding at $250k, expected): EUR_micro -3, BITCOIN -2, CAD/US2/SHATZ/US10/JPY/VIX/CORN/LEANHOG -1,
+MSCISING/CAC/RUSSELL/DOW/MXP +1, BBCOMM +2. -> private/target_book_250k.csv.
+Current broker: 4 stale 2026-07-01 (AUD -1, GOLD_micro -1, JPY -1, SP500_micro +1). IMPLIED ORDERS (18): JPY -1
+kept; AUD/GOLD_micro/SP500_micro flatten; rest open to target. INSPECTION ONLY -- nothing placed.
+READY for Phase C fills: next liquid window (~13:00-20:00 UTC weekday) + user at Gateway (Read-Only OFF, no competing
+IB session, TZ=UTC) -> make_rob_dynamic_config (done) -> run_systems -> run_strategy_order_generator ->
+run_stack_handler (continuous) -> paper fills -> reconcile. QA audit (#25) before real money.
