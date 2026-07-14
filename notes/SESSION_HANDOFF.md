@@ -869,3 +869,15 @@ session, TZ=UTC): (1) make_rob_dynamic_config on the 78 tradeable -> private/sys
 run_stack_handler (continuous) -> broker orders -> paper fills; (5) reconcile fills vs sim targets. Also: 4 stale
 paper positions from 2026-07-01 (JPY/AUD/SP500_micro/GOLD_micro) to flatten or fold into the first cycle;
 expiry-mapping reconciliation was fixed for those. QA audit (#25) still stands before any live money.
+
+### PHASE C PREP (2026-07-13, off-hours) — config generated + order inspection running
+Killed the redundant equal-weight research backtest (production uses Rob's FITTED weights, differs).
+Generated production config: make_rob_dynamic_config <78 tradeable> -> private/systems/rob_dynamic/config.yaml
+ (78 instruments, Rob's fitted instrument+forecast weights restricted to our tradeable set, fixed IDM, USD base).
+RUNNING: sysinit/futures/inspect_orders.py (CAPITAL=250000 VOL_TARGET=20) builds the rob_dynamic production system
+ (Risk/accountForOptimisedStage/optimisedPositions/Portfolios/PositionSizing/myFuturesRawData/ForecastCombine/
+ volAttenForecastScaleCap/Rules), extracts TODAY's optimal integer positions, compares to current broker holdings ->
+ IMPLIED ORDERS. READ-ONLY (places nothing). Saves private/target_book_250k.csv.
+NOTE it's 02:50 UTC (outside liquid window) -> this is prep only; actual paper FILLS wait for a liquid window
+ (~13:00-20:00 UTC weekday) with user present (Read-Only OFF, no competing IB session, TZ=UTC). 4 stale 2026-07-01
+ paper positions (JPY/AUD/SP500_micro/GOLD_micro) will net against the target book in the implied orders.
