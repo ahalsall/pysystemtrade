@@ -1,11 +1,45 @@
 # SESSION HANDOFF — pysystemtrade Barchart pipeline & AFTS strategy work
 
 **Purpose:** durable backup so this work can be fully resumed from a fresh session.
-**Last updated:** 2026-07-07 (work by Andrew Halsall + Claude).
+**Last updated:** 2026-07-14 (work by Andrew Halsall + Claude).
 **Repo:** /home/andrew/pysystemtrade · branch `develop` · fork `ahalsall/pysystemtrade` (origin), upstream `robcarver17/pysystemtrade`.
 
 ---
 
+## ⏱ RESUME HERE (2026-07-14)
+**✅ ROLL-STUCK FIX SHIPPED → 106 TRADEABLE; PRODUCTION BOOK BUILDS CLEAN; DOCS READ END-TO-END.**
+Universe went **78 → 106** after `sysinit/futures/fix_stuck_rolls.py` (adds the missing recent roll —
+current-priced→front — to each stuck calendar, rebuilds multiple+adjusted). This IS the sanctioned
+manual step (`data.md:343-344`), not a hack.
+
+**106-universe production book** (`inspect_orders.py`, rob_dynamic @ $250k / 20%, as of 2026-07-13):
+17 instruments held, 23 gross contracts, saved `private/target_book_250k.csv`. Diversified across
+sectors — Rates SHATZ/US2/US5(short); FX EUR_micro −5/CAD −1/MXP +1; Equity DOW +2/RUSSELL/CAC/
+EURO600/MSCISING +1, VIX −1; Cmdty CORN/LEANHOG(short)/EU-OIL/BBCOMM +1, BITCOIN −2. Optimiser
+correctly reaches for micros (EUR_micro/GOLD_micro/SP500_micro) for $250k granularity (#27 payoff).
+Broker paper acct holds 4 (AUD −1, GOLD_micro −1, JPY −1, SP500_micro +1) → **21 implied orders**
+to reconcile (incl. GOLD_micro & JPY sign flips, flatten SP500_micro). Sparse book is expected:
+most of 106 get 0 (weight×capital < 1 contract).
+
+**FALSE ASSUMPTIONS CORRECTED (docs read end-to-end this pass):**
+1. Roll-stuck ≠ "can't trade until Dec". The freeze was MY batch roll-calendar generator's artifact
+   (`build_roll_calendars.adjust_to_price_series` drops its last row) — `data.md` warns roll
+   calendars need per-instrument craft, "not suited to a batch process". I built the anti-pattern.
+2. Production NEVER batch-generates calendars. It runs `update_multiple_adjusted_prices` (incremental)
+   + `interactive_update_roll_status` (No-roll/Passive/Force/Force-outright/Roll-adjusted/No-open/
+   Close). **PASSIVE roll** (`production.md:1089`) closes the expiring leg + opens the forward via
+   normal trade flow — you hold the front & roll gradually; **no deferred contract ever required**.
+3. "priced = second-to-last is architectural" — wrong, same last-row-drop bug.
+
+**GO-FORWARD CORRECTIVE:** move CSI off batch roll generation onto the production incremental model
+for ongoing rolls (batch = bootstrap only); add a per-instrument roll-continuity gate (freshness +
+overlap verified before an instrument enters the tradeable set — US-TECH's 8-day overlap flagged).
+
+**TASKS:** #28 roll-stuck CLOSED ✅ · #29 CSI-only cutover CLOSED ✅ · #30 beta production IN PROGRESS
+(book builds; next = reconciliation gate: position/notional caps) · #25 QA audit PENDING (verify no
+PST framework step circumvented — do BEFORE any go-live) · #31 IB intraday recorder PENDING.
+
+--- (prior) ---
 ## ⏱ RESUME HERE (2026-07-09 morning)
 **✅ OVERNIGHT CAPITAL SWEEP DONE (20% + 25%, clean CSI, 8/8 runs, attribution+curves persisted
 in private/backtest_runs/capsweep_vt{20,25}_{cap}/).** `uv run python -m sysinit.futures.backtest_results`
