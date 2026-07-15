@@ -1,11 +1,194 @@
 # SESSION HANDOFF — pysystemtrade Barchart pipeline & AFTS strategy work
 
 **Purpose:** durable backup so this work can be fully resumed from a fresh session.
-**Last updated:** 2026-07-14 (work by Andrew Halsall + Claude).
+**Last updated:** 2026-07-15 (work by Andrew Halsall + Claude).
 **Repo:** /home/andrew/pysystemtrade · branch `develop` · fork `ahalsall/pysystemtrade` (origin), upstream `robcarver17/pysystemtrade`.
 
 ---
 
+## ⏱ RESUME HERE (2026-07-15 cont. — 117 CONFIRMED + GATE PASS; infra + research)
+**✅ 117-INST REBUILD CONFIRMED (was IN FLIGHT).** job bm5cuajvi completed; artifacts under
+`private/backtest_runs/rob_dynamic_prod_250k_dm275/` (stats.json universe=117): **Sharpe 0.912,
+ann 10.33%, realised vol 11.32%, maxDD -22.72% (shallower than 106's -30%), funded 102/117, held 14,
+idm precap 2.93 / postcap 2.75.** `target_book_250k.csv` refreshed (14 positions: EUR_micro -3, and
+±1 across CORN/US2/VIX/BITCOIN/SHATZ/CAD/US5/BBCOMM/CAC/RUSSELL/MSCISING/DOW/EU-OIL).
+**✅ RECONCILIATION GATE RE-RUN on the 117 book: PASS (exit 0), gross leverage 3.19x** (headroom to
+warn5/max8); max notional US2 -82.4% (cap), max risk VIX -2.63%/CAC 5.19% (1-contract lumpiness). IB
+broker-reconciliation checks SKIPPED (Gateway was down mid-afternoon; risk/leverage checks still ran).
+**✅ INFRA:** CSI Windows VM (`win11-csi`, KVM/libvirt) was shut off -> `virsh start` + **autostart
+ENABLED** (survives host reboot). IB hourly capture VERIFIED HEALTHY: `pst-ib-intraday.timer` +
+`pst-ib-capture-health.timer` enabled+active; today's 10:01 PDT capture succeeded (116/117 instruments
+-> siloed store). A background watcher polls for the next fresh UA/CSI export to auto-run
+`csi_sync_reingest --diff/--auto`.
+**✅ RESEARCH:** wrote `notes/reference/in_sample_fitting_research.md` (cited Carver "three Judases" +
+academic DSR/PBO/Harvey-Liu haircut/t>3 + 12-point practitioner checklist) backing [[no-in-sample-fitting]].
+**GENERATOR HARDENED for additions:** `make_rob_dynamic_config.py` now (a) preserves hand-tuned static
+params by using the existing yaml as base, regenerating ONLY instrument_weights/forecast_weights/fdm;
+(b) MERGES `instrument_additions.yaml` donor-inheritance so Tier 1/2 additions survive regeneration.
+**NEXT:** GASOIL data-gap cross-check (needs Gateway UP) -> wire as #118; #36 nearly done (11/12);
+deferred: dm2.5-vs-2.75 decision, -0.70 skew investigation; Phase C paper fills (Gateway + liquid window).
+
+--- (prior) ---
+
+## ⏱ RESUME HERE (2026-07-15 — UNIVERSE COMPLETENESS: TIER 1 WIRED (106→109))
+**✅ UNIVERSE COMPLETENESS AUDIT (`universe_completeness_audit.py`) + TIER 1 FIX.** Audit found 64
+Rob-config instruments dropped from our 106 + **24 fresh orphans** (deep fresh CSI data wired into
+NEITHER config). 12 are MAJOR verified markets (~30yr history, IB-scale-checked): nat gas, JGB(Japan
+bonds), soybeans, gilt, coffee, cocoa, sugar, CAD10, FTSE100, HANG, SPI200, gasoil. We'd missed huge
+trends (cocoa 4x'24, nat gas '21-22, JGB '22-24) — the concrete under-diversification behind the
+Rob-divergence. Artifacts: private/universe_{dropped,fresh_orphans,class_coverage}.csv. Task #36.
+
+**TIER 1 DONE (106→109):** GAS_US, JGB, SOYBEAN wired in. Mechanism (regeneration-safe, source-of-truth):
+new `private/systems/rob_dynamic/instrument_additions.yaml` maps each new symbol → a DONOR (the dead
+symbol Rob fitted for the same market: GAS_US_mini/JGB-SGX-mini/SOYBEAN_mini); `make_rob_dynamic_config.py`
+now MERGES additions, copying the donor's instrument_weight+forecast_weights(40)+fdm to the new symbol.
+Data already ingested+fresh. IB scale cross-check PASSED (GAS_US 3.17≈IB2.87, JGB 126.8≈128, SOYBEAN
+1198≈1191 — no SILVER/COTTON bug). IBCurrency=NA left as-is (valid convention, 35 insts use it incl
+AUD/BUND). Validated: all 3 produce forecasts+subsystem positions through the pipeline. #35 CLOSED.
+**TIER 1 CONFIRMED (109):** Sharpe 0.978 (=106's 0.979), maxDD -30% (better than -32%), funded 96/109;
+3 new funded over history (not in today's $250k integer book — below 1-contract threshold, expected).
+**✅ TIER 2 WIRED (109→117):** added GILT, CAD10, COFFEE, COCOA, SUGAR11, FTSE100, HANG, SPI200 via
+additions.yaml, each inheriting a same-class donor (GILT←BUND, CAD10←US10, COFFEE/COCOA/SUGAR11←CORN,
+FTSE100/SPI200←CAC, HANG←KOSPI_mini). All had instrumentconfig + IB mappings already; IB scale
+cross-check PASSED (ratios 0.98-1.05). Validated: all 8 produce forecasts+positions+FX-to-USD (GBP 1.26,
+CAD 0.74, HKD 0.128, AUD 0.65 all present). **GASOIL HELD** — CSI 917 vs IB 1101 priced-contract gap
+~20% (scale fine, likely stale-CSI/contract-mismatch DATA issue; needs check before wiring = the 12th).
+**IN FLIGHT:** 117-inst book/curve rebuild (job bm5cuajvi, dm_max 2.75) → final validation + refresh
+target_book for gate re-run. **NEXT:** confirm 117 rebuild + re-run reconciliation_gate; investigate
+GASOIL data gap (then wire = 118); #36 nearly done (11/12). Still deferred: dm2.5-vs-2.75 decision.
+
+**2021-22 ATTRIBUTION (job done):** our window −2.4%. OIL made money (CRUDE_W +$12.2k, OilGas +$8.1k) —
+we caught the oil leg; nat-gas absence missed the gas leg (Tier1 fixes). BUT bigger drag was Equity
+−$12.9k (SP400 −$20.7k), Bond −$8.3k, Metals −$7.4k wiping out Ags +$18.3k + OilGas +$8.1k. So the
+2021-22 gap vs Rob's +27% is MULTI-FACTOR: nat gas is the fixable piece, but the equity/bond/metals
+positioning drag is the bigger chunk — universe completeness helps but isn't a silver bullet.
+
+--- (prior) ---
+
+## ⏱ RESUME HERE (2026-07-14 night — VOL-SHORTFALL / ROB-DIVERGENCE INVESTIGATION)
+**Chased "we're missing out due to low achieved vol" and it REFRAMED twice — key learnings:**
+- **"More vol" is NOT the fix (refuted).** Experiment $1M/30%/attenuation-OFF (`experiment_hirisk_noatten.py`,
+  saved backtest_runs/EXPERIMENT_1000k_30vol_noatten/): realized vol 24.6%, ann +22.7% BUT Sharpe DROPPED
+  0.985→0.92 and **maxDD −86%** (near-ruin). Cranking risk amplified the GOOD years (2020 +26%, 2021 +30%)
+  but catastrophically the BAD ones (2023 +3.2%→−15.8%, 2024 −6.1%→−16.6%). Attenuation was correctly
+  de-risking the chop; turning it off = disaster. Chronic under-vol is mostly under-LEVERAGE (same Sharpe),
+  not lost alpha.
+- **2022 miss is POSITIONING, not throttle (refuted my attenuation thesis).** Even attenuation-OFF + full
+  risk, cal-2022 was still −3.4% (barely better than baseline −6.2%). If we'd HELD the winners, risk would
+  have paid. So it's what we hold, not how much.
+- **Tax-year re-slice vs Rob's live futures (vol-normalized to 25%):** only **6/11 sign agreement**, huge
+  two-way divergences (we beat him 2017-18/2020-21; he beat us 2015-16/2019-20/**2021-22 energy +27 vs our
+  −12.5**). We are NOT "Rob under-levered" — we're a DIFFERENT return stream. Caveats: our backtest vs his
+  LIVE (frictions/evolving system/equity hedge), vol-scaling amplifies low-vol-year noise, n=11 small.
+- **Rules ruled out** — our config has the FULL 40-rule AFTS set incl all rel-value (relcarry, relmomentum,
+  skewabs/rv, mrinasset). Not the gap.
+- **CONCRETE GAP FOUND → task #35:** we hold ZERO natural gas. Rob's cfg uses GAS_US_mini but our CSI data
+  for it is DEAD (ends 2003); GAS-LAST dead (2007). Fresh Henry Hub nat gas EXISTS in our DB as `GAS_US`
+  (→2026-07-07) but isn't wired to the config. So we sat out the huge 2021-22 EU-gas-crisis trend. Fixable
+  like CNH→HKEX (map GAS_US in / repoint GAS_US_mini ingest). GASOIL also fresh+addable. See [[csi-portfolio-cap-strategy]].
+- **IN FLIGHT:** `attr_2022_energy.py` (job) building the per-instrument/asset-class P&L decomposition for
+  Rob's 2021-22 window ($250k dm2.5) → backtest_runs/attr_2022_energy/ — will quantify what the nat-gas
+  hole + our oil positions actually cost. Compare-plot artifacts: EXPERIMENT_1000k_30vol_noatten/,
+  rob_dynamic_prod_250k_dm250/ & _dm275/, dm_compare_250_vs_275.png. Rob live results:
+  notes/reference/rob_carver_annual_futures_results.md.
+
+--- (prior) ---
+
+## ⏱ RESUME HERE (2026-07-14 late — #31 IB INTRADAY RECORDER DONE + dm_max→2.75)
+**✅ #31 SILOED IB INTRADAY RECORDER — repointed to FULL 106 universe + SCHEDULED.**
+`ib_intraday_capture.py` load_universe() now reads the live production universe (rob_dynamic
+instrument_weights = 106, single source of truth; auto-widens with the generator; env CAPTURE_UNIVERSE
+overrides; phase_a_audit is legacy fallback). Was stale at 74 (phase_a READY). Seed history was 60
+instruments × ~30d hourly (Jun11–Jul10; IB's hourly lookback ≈ 1 month, so regular capture is the ONLY
+way to build depth — miss >1mo = permanent gap). LIVE top-up+expansion running (job bz5m2dh4m): tops up
+the 60 (4-day gap) + seeds 46 NEW (roll-fix EU sectors/MSCI*/KR*/NIKKEI/EURIBOR...). HARD ISOLATION
+intact: writes ONLY private/data/parquet_ib_intraday/, sim DB never reads it.
+**SCHEDULED:** systemd --user `pst-ib-intraday.timer` (+ .service), OnCalendar Mon-Fri 10:00 & 18:00
+local PDT, Persistent, enabled. Linger=yes so it runs logged-out. Validated uv resolves venv under
+stripped systemd env (ruled out silent no-op). **CAVEAT: only succeeds if IB Gateway is UP at fire
+time** (fails clean if down). First auto-fire ~today 18:00 PDT — verify via `journalctl --user -u
+pst-ib-intraday`. Barchart timer left DISABLED/untouched. Retime OnCalendar to match Gateway hours.
+**+ CAPTURE-HEALTH MONITOR:** `ib_capture_health.py` + `pst-ib-capture-health.timer` (Mon 09:00 PDT
+weekly, NO Gateway needed so it ALWAYS runs even when capture fails). Reports last-bar/staleness per
+instrument + `days_to_permanent_gap` (30 − stale; the number that matters — beyond it the hourly tape
+is un-backfillable). Non-zero exit on DANGER/MISSING; writes private/ib_capture_health.csv, journald-
+logged. **FINAL: capture 105/106, health FRESH 105 / EXCLUDED 1 / exit 0.** COTTON = the 1 fail:
+diagnosed to IB Error 162 (HMDS returned NO intraday Trades data for its Oct-2026 contract TTV6/NYMEX);
+**DAILY works (250 bars) + mapping verified OK in #32 (price=cotton 0.8154)** => benign IB intraday
+gap, NOT a config bug, zero trading impact. Health check now treats it as EXCLUDED (env CAPTURE_EXCLUDE,
+default COTTON) — non-alarming but auto-recovers to FRESH if a future liquid contract returns intraday.
+
+**dm_max BUMPED 2.5→2.75** in yaml (estimated IDM capped at 2.75; better than old flat fixed 2.75 —
+uses true diversification but caps at 2.75, so drops to safer estimate in high-corr regimes). Full
+block added: instrument_div_mult_estimate{func, ewma_span:125, dm_max:2.75}. dm2.5 run preserved at
+private/backtest_runs/rob_dynamic_prod_250k_dm250/ (Sharpe 0.985, vol 12.9%, maxDD -27.6%, 14 held,
+gross 16, lev 3.20x). dm2.75 rebuild RUNNING (job b6ztphh43) -> writes _dm275; expect vol up toward
+target, book bigger, maxDD deeper. prod_book_curve_idm.py LABEL now tracks dm_max for side-by-side.
+NEXT: dm2.5-vs-2.75 compare + re-run gate on new book; wire gate as exit-code precondition; -0.68 skew.
+
+--- (prior) ---
+
+## ⏱ RESUME HERE (2026-07-14 — #25 QA AUDIT DONE)
+**✅ QA AUDIT (#25) COMPLETE — framework faithfully applied, 3 config-drift findings fixed, audit
+now 0 findings.** Tool: `sysinit/futures/qa_audit.py` (read-only; resolved config params + per-inst
+coverage, no 30-min optimiser rebuild).
+
+**PASS (no PST step circumvented):** (a) data coverage clean across all 106 — every instrument has
+adjusted prices, fresh priced contract, block/ccy metadata, SR cost, FX to USD, forecast_weights,
+positive weight. (b) Weight subsetting SAFE — framework renormalises (`weights_sum_to_one` +
+`fix_weights_vs_position`), so Rob's weights summing to 0.658 over our 106 is harmless; relative
+proportions preserved. (c) Dynamic-opt faithful — `config.small_system` fills from
+`sysdata/config/defaults.yaml`: **shadow_cost=50** (AFTS Strategy 25 exact), cost_multiplier=1.0,
+tracking_error_buffer=0.0125, shrink=0.5. (d) Optimiser cost penalty active (pulls per-contract
+costs directly, ungated by use_SR_costs); use_SR_costs=False is the framework default.
+
+**3 FINDINGS — all config drift, FIXED in the yaml (not .py):**
+1. vol_target was 25 in file → **20.0** (AFTS parity; run_systems reads the FILE, inspect_orders.py
+   runtime-override had masked it).
+2. capital was 500k in file → **250000**.
+3. fixed IDM 2.75 (inherited from Rob's 170-inst fit, used UNCAPPED — dm_max=2.5 only caps the
+   ESTIMATED path) → flipped **use_instrument_div_mult_estimates: true** so IDM is estimated from
+   our 106's correlations (capped 2.5). Fixed 2.75 now inert fallback.
+
+**GENERATOR HARDENED (`make_rob_dynamic_config.py`):** now regenerates ONLY the 3 instrument-derived
+blocks (instrument_weights, forecast_weights, forecast_div_multiplier) and PRESERVES all hand-tuned
+static params by using the existing yaml as its base (bootstraps from rob_system only on first run,
+with a loud warning). Removed the one baked-in config VALUE it held (use_instrument_div_mult_estimates
+=False). Principle (user): the custom yaml is the single source of truth for tuning; .py never writes
+a config value. Verified round-trip: re-running on the 106 preserved 20/250000/estimated-IDM.
+
+**✅ #30 RECONCILIATION SAFETY GATE BUILT** — `sysinit/futures/reconciliation_gate.py` +
+`private/systems/rob_dynamic/risk_gate.yaml` (hand-tuned caps, source of truth). Pre-trade tripwire:
+computes per-instrument notional %, annual risk % capital, order/position vs ADV, and portfolio gross
+leverage for the TARGET book using pysystemtrade's OWN risk primitives (get_base_currency_point_size_
+per_contract / get_current_price_of_instrument / get_current_daily_stdev_for_instrument), plus
+broker-vs-DB reconciliation breaks. Per-row PASS/WARN/BLOCK; any BLOCK -> non-zero exit so a launcher
+refuses to trade. Caps: gross_lev warn 5/max 8, inst risk warn 6/max 10%, inst notional warn 250/max
+400% (rate futures have huge notional/contract -- naive <capital rule would falsely block), single
+order max 50, order/pos vs ADV warns, reconciliation WARN in beta (block_on_reconciliation_break:false).
+**FIRST RUN ON CURRENT BOOK: PASS (exit 0).** Gross leverage **3.83x** (headroom to 5/8); max single-
+inst risk CAC 5.19% (1-contract lumpiness), max notional US2 82.4%/cap; orders 0.00-0.03% of ADV
+(non-binding); no reconciliation breaks. Standing guard = catches a regressed scale bug / leverage
+blowup / fat-finger / broker drift BEFORE orders go out. NEXT: wire the gate as an exit-code
+precondition before the stack-handler/order path.
+
+**✅ ESTIMATED-IDM REGEN DONE** (`prod_book_curve_idm.py`; artifacts under `private/backtest_runs/
+rob_dynamic_prod_250k_est_idm/`: idm.csv 7835d pre/post-cap, curve.csv, daily_pnl.parquet, curve.png,
+stats.json). **IDM FINDING:** estimated pre-cap latest **2.915** (full-hist mean 2.431, last-5y 2.598,
+max 2.915), post-cap **2.50** (Rob dm_max), vs handcrafted fixed **2.75**. Our 106 is diversified
+enough that TRUE IDM > 2.5 cap — **cap binds 51% of history**. Handcrafted 2.75 was a sensible middle
+(between capped 2.5 and true 2.9). Fixed2.75->estimated-capped2.5 = effective IDM -9% => more
+conservative book (17->14 held, gross 23->16, leverage 3.83x->3.20x). **TUNING DECISION OPEN:** we're
+chronically under vol target (12.9% realised vs 20%), so consider bumping dm_max ~2.5->2.6 (one-line
+yaml `instrument_div_mult_estimate.dm_max`) to deploy more of the diversification we have, while
+keeping Rob's crisis-robustness intent (don't uncap). **CURVE ($250k/20%/est-IDM, 1996-2026):** Sharpe
+**0.985** (best yet), ann 12.68%, realised vol 12.88%, maxDD **-27.6%** (shallower than hi-cap runs),
+avgDD -8.1%, funded 90/106, **skew -0.68** (FLAG: trend usually +skew; likely discrete-optimiser few-
+chunky-positions at low capital — understand before scaling capital). **GATE re-run on new 14-pos book:
+PASS (exit 0), leverage 3.20x.** NEXT: (a) dm_max tuning decision; (b) investigate -0.68 skew; (c) wire
+gate as exit-code precondition before stack-handler.
+
+--- (prior) ---
 ## ⏱ RESUME HERE (2026-07-14)
 **✅ ROLL-STUCK FIX SHIPPED → 106 TRADEABLE; PRODUCTION BOOK BUILDS CLEAN; DOCS READ END-TO-END.**
 Universe went **78 → 106** after `sysinit/futures/fix_stuck_rolls.py` (adds the missing recent roll —

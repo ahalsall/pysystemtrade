@@ -27,14 +27,25 @@ from sysproduction.data.prices import diagPrices
 IB_LIVE = os.environ.get("IB_LIVE", "0") == "1"
 FREQ_NAME = os.environ.get("CAPTURE_FREQ", "Hour")  # Hour (default) | Minute for a small subset
 
-# production universe = Phase A READY set if available, else fall back to all audited rows
+# Universe = the LIVE production universe (rob_dynamic instrument_weights = our tradeable set, single
+# source of truth). Auto-widens as the generator adds instruments. Env CAPTURE_UNIVERSE overrides;
+# phase_a_audit READY set is the legacy fallback.
 def load_universe():
+    env = os.environ.get("CAPTURE_UNIVERSE")
+    if env:
+        return sorted(set(env.replace(",", " ").split()))
+    prod = "private/systems/rob_dynamic/config.yaml"
+    if os.path.exists(prod):
+        import yaml
+        iw = yaml.safe_load(open(prod)).get("instrument_weights", {})
+        if iw:
+            return sorted(iw.keys())
     fp = "private/phase_a_audit.csv"
     if os.path.exists(fp):
         rows = list(csv.DictReader(open(fp)))
         ready = [r["instrument"] for r in rows if r["verdict"] == "READY"]
         return ready or [r["instrument"] for r in rows]
-    raise SystemExit("run phase_a_instrument_audit first (need private/phase_a_audit.csv)")
+    raise SystemExit("no universe source (production config instrument_weights or phase_a_audit.csv)")
 
 dp = diagPrices()
 universe = load_universe()
