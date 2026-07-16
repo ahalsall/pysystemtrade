@@ -28,12 +28,20 @@ build_and_write_roll_calendar IS the batch anti-pattern (data.md:271 "not suited
 Rob: "can't fully automate rolling"). Sector indices IMPROVED: US-ENERGY/US-TECH/... now priced=Sep/
 fwd=Dec-2026 (fresh export carried their Dec forwards -> no longer stuck). DEFERRED: 20 non-universe
 research instruments (NOK/OMX/YENEUR/VNKI/BOVESPA...) still behind, don't gate anything.
-**NEXT (TOOL REDESIGN, agreed):** rewrite csi_sync_reingest to the INCREMENTAL model -- for NEW-ROWS just
-append prices + extend multiple/adjusted WITHOUT regenerating the roll calendar; only touch rolls on a
-genuine NEW-CONTRACT event (like production update_multiple_adjusted_prices). Ends the batch-then-
-fix_stuck_rolls cycle. Also: TARGET_BOOK/gate were on 07-07 data -> optionally refresh prod book on 07-15
-data (Sharpe/DD ~unchanged over 30y). New tools this session: plot_saved_run.py (committed),
-rob_benchmark_compare.py.
+**✅ TOOL REDESIGN DONE — csi_sync_reingest is now INCREMENTAL, roll-calendar-free.** Rewrote reingest()
+to mirror pysystemtrade's PRODUCTION daily path: ingest fresh CSI contract prices, then call
+`update_multiple_adjusted_prices_for_instrument(pst, dataBlob)` -- reads current PRICE/FWD/CARRY from the
+last multiple-prices row (current_contract_dict), fetches fresh prices for JUST those contracts, appends
+(update_multiple_prices_with_dict + update_with_multiple_prices_no_roll). NO build_and_write_roll_calendar
+on sync. Routing: has-multiple-prices -> incremental; first-ingest -> bootstrap build-once (flagged for a
+fix_stuck_rolls review, since the batch gen drops the last roll); roll-in-source -> ROLL-NEEDED reported
+(run fix_stuck_rolls), NOT auto-rebuilt. Rolling stays a SEPARATE deliberate step (data.md:271 + Rob "can't
+automate rolling"). SMOKE-TESTED CORN+BUND: "incremental append (no roll calendar)", roll-calendar file
+mtimes BYTE-IDENTICAL before/after (proves no regeneration), priced preserved, adj fresh 07-15. This ends
+the batch-then-fix_stuck_rolls cycle. Remaining efficiency TODO (deferred, non-bug): contract-price ingest
+still re-reads all raw files per instrument (idempotent; not the bug) -- could mtime-filter + append only.
+Also deferred: TARGET_BOOK/gate on 07-07 data -> optionally refresh prod book on 07-15 (Sharpe/DD ~unchanged
+over 30y). New tools this session: plot_saved_run.py + rob_benchmark_compare.py (committed).
 
 --- (prior) ---
 

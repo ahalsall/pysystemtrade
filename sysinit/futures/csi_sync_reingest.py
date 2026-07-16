@@ -1,19 +1,33 @@
-"""Selective CSI re-ingest workflow.
+"""Selective CSI sync — INCREMENTAL, roll-calendar-free.
 
 After Unfair Advantage syncs fresh data into the raw CSI export dir (private/data/futures/csi/,
-incl. UA/Data/PST/), this keeps the sim DB in step WITHOUT a full rebuild:
-  1. stage only the target instruments' raw contract files into csi_ingest
-     (<CSISYM>_<YYYYMM>.csv  ->  Day_<PST>_<YYYYMM>00.csv, prepending the CSI header)
-  2. re-ingest contract prices + rebuild roll calendar -> multiple -> adjusted for each
-  3. validate: report new priced contract + last non-NaN adjusted date
+incl. UA/Data/PST/), this keeps the sim DB in step WITHOUT regenerating roll calendars.
 
---auto detects instruments whose raw export has a NEWER front contract than the DB (the
-roll-advancing / forward-coverage case, e.g. a new Dec contract appeared) and re-ingests those.
+WHY (the whole point of the 2026-07-15 redesign): the old version re-ran
+build_and_write_roll_calendar per instrument on every sync -- i.e. the BATCH roll-calendar
+generation that data.md:271 explicitly warns is "careful craftsmanship, not suited to a batch
+process", and which drops the calendar's last row (adjust_to_price_series) -> strands the priced
+contract -> the roll-stuck bug, needing fix_stuck_rolls to patch every time. Rob is blunt in his
+rolling blog: "I don't think you can fully automate the process of rolling... it needs a lot of
+human judgement." So this tool now mirrors pysystemtrade's PRODUCTION daily path
+(update_multiple_adjusted_prices_for_instrument): read the current PRICE/FORWARD/CARRY contracts
+from the last row of existing multiple prices, fetch fresh prices for JUST those contracts, and
+APPEND -- no roll calendar involved. update_with_multiple_prices_no_roll refuses (raises) rather
+than corrupt if a roll is detected. Rolling itself stays a SEPARATE, deliberate step
+(sysinit.futures.fix_stuck_rolls, run on review) -- never batched into the daily sync.
+
+Per instrument:
+  - HAS existing multiple prices  -> ingest fresh contract prices, then INCREMENTAL append
+                                     (multiple + adjusted) via the framework. No roll calendar.
+  - FIRST ingest (no multiple pr) -> BOOTSTRAP: build the roll calendar ONCE (legit single-
+                                     instrument use) + multiple + adjusted. Flagged for a roll review.
+  - roll detected in source data  -> reported as ROLL-NEEDED (run fix_stuck_rolls); NOT auto-rebuilt.
 
 USAGE:
   uv run python -m sysinit.futures.csi_sync_reingest BOBL KR10     # explicit
-  uv run python -m sysinit.futures.csi_sync_reingest --auto        # detect & fix all stale
-  uv run python -m sysinit.futures.csi_sync_reingest --auto --dry  # just report what it would do
+  uv run python -m sysinit.futures.csi_sync_reingest --auto        # detect & sync all behind
+  uv run python -m sysinit.futures.csi_sync_reingest --diff        # just report what's behind
+  uv run python -m sysinit.futures.csi_sync_reingest --auto --dry  # report the plan, do nothing
 """
 import os
 import re
@@ -81,8 +95,8 @@ def stage(pst, csi_sym):
 
 def diff():
     """Full daily diff: for every mapped instrument, compare the raw CSI export to the DB and
-    flag what needs re-ingesting. Two independent triggers:
-      NEW-CONTRACT : raw has a newer front contract than the DB (roll-advancing / forward coverage)
+    flag what needs syncing. Two independent triggers:
+      NEW-CONTRACT : raw has a newer front contract than the DB (a roll may be due -- review)
       NEW-ROWS     : raw's newest contract has data beyond the DB's adjusted last date (daily refresh)
     Returns list of dicts. Cheap: last-line reads for raw, one adjusted read per instrument."""
     from sysproduction.data.prices import diagPrices
@@ -119,26 +133,59 @@ def db_state_contract(pst, dp):
     return _DB_C[pst]
 
 
-def reingest(pst):
-    csi_sym = PST2CSI.get(pst)
-    if not csi_sym:
-        print(f"  {pst}: no CSI symbol mapping", flush=True); return False
-    if not raw_files(csi_sym):
-        print(f"  {pst} ({csi_sym}): no raw files in {UA_DIR}", flush=True); return False
-    staged = stage(pst, csi_sym)
-    init_db_with_split_freq_csv_prices_for_code(pst, get_resolved_pathname("private.data.futures.csi_ingest"),
-                                                csv_config=_config_for(pst))
+def has_multiple_prices(pst, dp):
+    """True if the instrument already has a multiple-prices series (so we can append incrementally)."""
+    try:
+        mp = dp.get_multiple_prices(pst)
+        return mp is not None and len(mp) > 0
+    except Exception:
+        return False
+
+
+def _bootstrap(pst):
+    """FIRST-ingest only: build the roll calendar ONCE (the legitimate single-instrument use of
+    build_and_write_roll_calendar) + multiple + adjusted. The batch generator drops the last roll,
+    so a fix_stuck_rolls review must follow -- reported by main()."""
     build_and_write_roll_calendar(pst, output_datapath=RCP, write=True, check_before_writing=False)
     _dedupe_roll_calendar_csv(pst, RCP)
     process_multiple_prices_single_instrument(pst, csv_roll_data_path=RCP, ADD_TO_DB=True, ADD_TO_CSV=False)
     process_adjusted_prices_single_instrument(pst, ADD_TO_DB=True, ADD_TO_CSV=False)
-    print(f"  {pst}: staged {staged} contract files, re-ingested + rebuilt", flush=True)
-    return True
 
 
-def validate(pst):
-    from sysproduction.data.prices import diagPrices
-    dp = diagPrices()
+def reingest(pst, data, dp):
+    """Sync one instrument. Returns an outcome tag: incremental | bootstrap | roll-needed | skipped-*."""
+    from sysproduction.update_multiple_adjusted_prices import update_multiple_adjusted_prices_for_instrument
+    csi_sym = PST2CSI.get(pst)
+    if not csi_sym:
+        print(f"  {pst}: no CSI symbol mapping", flush=True); return "skipped-no-map"
+    if not raw_files(csi_sym):
+        print(f"  {pst} ({csi_sym}): no raw files in {UA_DIR}", flush=True); return "skipped-no-raw"
+    # 1. ingest fresh CSI contract prices into the per-contract store (append; scale/inverse applied)
+    staged = stage(pst, csi_sym)
+    init_db_with_split_freq_csv_prices_for_code(
+        pst, get_resolved_pathname("private.data.futures.csi_ingest"), csv_config=_config_for(pst))
+    # 2. extend multiple + adjusted
+    if has_multiple_prices(pst, dp):
+        try:
+            update_multiple_adjusted_prices_for_instrument(pst, data)  # INCREMENTAL, no roll calendar
+            print(f"  {pst}: +{staged} contract files -> incremental append (no roll calendar)", flush=True)
+            return "incremental"
+        except Exception as e:
+            msg = str(e)
+            if "roll" in msg.lower():
+                print(f"  {pst}: ROLL-NEEDED -- roll present in source but not registered; "
+                      f"run fix_stuck_rolls to advance (append not done)", flush=True)
+                return "roll-needed"
+            print(f"  {pst}: incremental FAILED ({type(e).__name__}: {msg[:70]})", flush=True)
+            return "error"
+    else:
+        _bootstrap(pst)
+        print(f"  {pst}: +{staged} contract files -> BOOTSTRAP (first ingest; roll calendar built once)",
+              flush=True)
+        return "bootstrap"
+
+
+def validate(pst, dp):
     mp = dp.db_futures_multiple_prices_data.get_multiple_prices(pst)
     adj = dp.db_futures_adjusted_prices_data.get_adjusted_prices(pst).dropna()
     print(f"    {pst}: priced={mp['PRICE_CONTRACT'].iloc[-1]} fwd={mp['FORWARD_CONTRACT'].iloc[-1]} "
@@ -146,31 +193,53 @@ def validate(pst):
 
 
 def main():
+    from sysdata.data_blob import dataBlob
+    from sysproduction.data.prices import diagPrices
     args = [a for a in sys.argv[1:]]
     dry = "--dry" in args
     args = [a for a in args if not a.startswith("--")]
     if "--auto" in sys.argv or "--diff" in sys.argv:
         det = diff()
-        print(f"DIFF: {len(det)} instrument(s) need re-ingest (raw CSI ahead of DB):")
+        print(f"DIFF: {len(det)} instrument(s) behind (raw CSI ahead of DB):")
         for d in det:
             print(f"  {d['pst']:<14} {d['reasons']}")
         codes = [d["pst"] for d in det]
         if "--diff" in sys.argv:
-            print(f"\n(diff-only; {len(codes)} would be re-ingested) codes: {codes}")
+            print(f"\n(diff-only; {len(codes)} would be synced) codes: {codes}")
             return
     else:
         codes = args
     if not codes:
         print("nothing to do"); return
     if dry:
-        print("dry-run: would re-ingest", codes); return
-    print(f"\nRe-ingesting {len(codes)}: {codes}\n", flush=True)
-    done = [c for c in codes if reingest(c)]
+        print("dry-run: would sync", codes); return
+
+    print(f"\nSyncing {len(codes)} (incremental append; no roll-calendar regeneration): {codes}\n", flush=True)
+    data = dataBlob()
+    dp = diagPrices(data)
+    outcomes = {}
+    done = []
+    for c in codes:
+        tag = reingest(c, data, dp)
+        outcomes.setdefault(tag, []).append(c)
+        if tag in ("incremental", "bootstrap"):
+            done.append(c)
+
     print("\nvalidation:", flush=True)
     for c in done:
-        try: validate(c)
-        except Exception as e: print(f"    {c}: validate err {e}")
-    print(f"\nDONE: {len(done)}/{len(codes)} re-ingested", flush=True)
+        try:
+            validate(c, dp)
+        except Exception as e:
+            print(f"    {c}: validate err {e}")
+
+    print("\nSUMMARY:", flush=True)
+    for tag, cs in sorted(outcomes.items()):
+        print(f"  {tag:<14} {len(cs)}: {cs}", flush=True)
+    roll_review = outcomes.get("bootstrap", []) + outcomes.get("roll-needed", [])
+    if roll_review:
+        print(f"\n>>> ROLL REVIEW NEEDED for {len(roll_review)} instrument(s) (bootstrap drops the last roll,"
+              f" or a roll is due). Run the deliberate roll step:", flush=True)
+        print(f"    uv run python -m sysinit.futures.fix_stuck_rolls {' '.join(roll_review)}", flush=True)
 
 
 if __name__ == "__main__":
