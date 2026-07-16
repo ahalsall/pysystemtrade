@@ -39,6 +39,12 @@ config = Config("private.systems.rob_dynamic.config.yaml")
 CAP = float(config.notional_trading_capital)
 VOL = float(config.percentage_vol_target)
 FIXED_IDM = float(config.instrument_div_multiplier)
+# DM_MAX env overrides the estimated-IDM cap for a side-by-side COMPARISON run (e.g. 2.5 vs 2.75).
+# A comparison run writes its own labelled artifacts but does NOT overwrite the production target_book.
+_dm_override = os.environ.get("DM_MAX")
+if _dm_override:
+    config.instrument_div_mult_estimate["dm_max"] = float(_dm_override)
+    print(f"[DM_MAX override] dm_max -> {_dm_override} (comparison run; target_book NOT overwritten)", flush=True)
 try:
     _dm = float(config.instrument_div_mult_estimate["dm_max"])  # label tracks the cap for side-by-side runs
 except Exception:
@@ -114,7 +120,10 @@ print(f"  plot -> {png}", flush=True)
 # ---------- TARGET BOOK ----------
 today = pos.iloc[-1]; asof = pos.index[-1].date()
 tgt = today.round().astype(int); tgt = tgt[tgt != 0].sort_values()
-tgt.to_csv("private/target_book_250k.csv", header=["target_contracts"])
 print(f"\n[BOOK] {len(tgt)} held / {n} universe | gross {int(tgt.abs().sum())} contracts (as of {asof})", flush=True)
 print(tgt.to_string(), flush=True)
-print(f"\nsaved -> private/target_book_250k.csv  | all artifacts under {outdir}/", flush=True)
+if _dm_override:
+    print(f"\n[comparison run dm_max={_dm_override}] target_book NOT overwritten; artifacts under {outdir}/", flush=True)
+else:
+    tgt.to_csv("private/target_book_250k.csv", header=["target_contracts"])
+    print(f"\nsaved -> private/target_book_250k.csv  | all artifacts under {outdir}/", flush=True)

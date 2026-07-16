@@ -6,6 +6,32 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-16 — IDM CAP DECIDED (2.75) + PROD BOOK/GATE REFRESHED on 07-15)
+**✅ IDM CAP DECISION FINAL: dm_max = 2.75 (KEPT). No longer deferred.** First CLEAN matched comparison
+(both caps, SAME 117 universe + SAME 07-15 data; prior dm250-vs-dm275 was confounded by 106-vs-117):
+  dm_max 2.5 : Sharpe 0.906  vol 10.7%  ret 9.7%  maxDD -22.0%  avgDD -6.5%  skew -0.77  (IDM 2.96->2.50)
+  dm_max 2.75: Sharpe 0.918  vol 11.3%  ret 10.4% maxDD -22.6%  avgDD -6.7%  skew -0.70  (IDM 2.96->2.75)
+Cap genuinely BINDS (true uncapped IDM latest 2.96 > both caps). Difference is SMALL: 2.75 lets ~8% more
+diversification through -> +0.6pt vol, +0.7pt ret, ~0.6pt deeper DD, FLAT Sharpe (within noise), slightly
+better skew. => dm_max is a risk-DEPLOYMENT / crisis-margin dial, NOT a Sharpe lever (so safe from fitting).
+DECIDED on EX-ANTE grounds (not backtest max): keep 2.75 because we're chronically far under vol target
+(11% realized vs 20%), so deploying more of our GENUINE diversification is justified, while 2.75 still caps
+BELOW the 2.96 true estimate so the crisis-breakdown backstop stays intact; trivial DD cost, better skew.
+Both defensible (2.5 = Rob's default/max margin); user chose 2.75. See [[idm-cap-decision]]. Config already
+2.75 -> no change. Comparison tool: prod_book_curve_idm.py now takes DM_MAX env override (labelled dm250/dm275
+side-by-side runs that do NOT overwrite the production target_book).
+**✅ PROD BOOK + GATE REFRESHED on fresh 07-15 data (dm2.75/117):** Sharpe 0.918, ann 10.4%, vol 11.3%,
+maxDD -22.6%, avgDD -6.7%, skew -0.70, funded 102/117, **13 held** (EUR_micro -4; +-1 CORN/US2/CAD/SHATZ/
+VIX/BITCOIN/EU-OIL/MSCISING/MXP/DOW/CAC/BBCOMM), gross 16. target_book_250k.csv refreshed. GATE PASS (exit 0),
+gross leverage **2.89x** -- and IB Gateway was CONNECTED so broker reconciliation ran: flags the 4 stale
+2026-07-01 paper positions (AUD/GOLD_micro/JPY -1, SP500_micro +1) as flatten orders (fold into first Phase C
+cycle). (07-15 vs prior 07-07 book: Sharpe 0.912->0.918 = unchanged; 8 days don't move a 30y stat, as expected.)
+**NEXT:** Phase C paper fills (Gateway + liquid window + Read-Only OFF + TZ=UTC); flatten/net the 4 stale
+positions; low-priority 20 non-universe research instruments (need bootstrap). Commit: prod_book_curve_idm
+DM_MAX override.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-15 cont.2 — CSI SYNC TO 07-15 + ROB DIVERGENCE CLOSED)
 **✅ ROB DIVERGENCE FORMALLY CLOSED.** Apples-to-apples: OUR 117-universe rob_dynamic @ $250k/20%,
 period-split from saved daily P&L (`rob_benchmark_compare.py <label>`, reads saved run, no rebuild):
