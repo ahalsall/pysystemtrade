@@ -6,6 +6,40 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-16 — VOL SHORTFALL CRACKED (RCF) + gapped-contract earmark)
+**✅ VOL SHORTFALL DEFINITIVELY EXPLAINED = Relative Correlation Factor (Rob's term).** Not a bug, not
+the cap, not lost universe exposure. Empirical decomposition (`vol_shortfall_decomp.py`, fractional
+standard portfolio, 117/20%): portfolio realises 11.3% = **57% of 20% target**; per-instrument SUBSYSTEMS
+OVER-realise (24.4%, 122%) so sizing is fine; the whole shortfall is PORTFOLIO-level. Realised avg pairwise
+correlation **0.075** (hugely diversified) -> realised diversification factor 0.22, but the estimator prices
+it at 0.40 -> **RCF ~= 0.55** (estimator credits ~55% of real diversification). IDM estimated 30y-mean 2.49
+(effective 2.10) vs **vol-hitting 3.72**; the ESTIMATOR (not the 2.75 cap) is the binding constraint on
+average. -> private/backtest_runs/vol_decomp/summary.json.
+**KICKER:** broadening 106->117 LOWERED achieved vol (older 106 ~15.2%/76% -> 117 11.3%/57%) because the
+conservative estimator under-credits the ADDED diversification (realised corr fell but estimator didn't
+follow). More instruments -> more real diversification the estimator won't deploy -> lower achieved vol.
+This is why "universe is sorted, why the shortfall?" felt unsolved -- breadth CAUSES it, by design.
+**ROB CONFIRMS (notes/reference/rob_vol_targeting_research.md, cited):** this is his RCF; correlation
+estimator is DELIBERATELY conservative (pooled, weekly, ~250-EWMA crisis-averaged, negative-corr floored)
++ IDM capped "below estimate" -- the accepted price of crisis-correlation robustness (realised 0.075 corr
+snaps toward 1 in a crisis; the low IDM is the protection). His TARGET is 25% "on average" (not our 20%),
+which resolves most of the "vs Rob" headline gap. His fix for integer-rounding loss = more capital / the
+optimiser, NOT a higher IDM.
+**VERDICT:** by design; benign. LEVERS (all Rob-endorsed): raise the TARGET (25% like Rob -> ~14% realised)
+if more absolute vol wanted; else accept as crash insurance. MUST NOT un-conservatize the estimator / force
+IDM to ~3.7 -- that deploys fragile diversification + removes crisis protection (same error as uncapping;
+also fitting-adjacent). Open input: user confirming Rob's AFTS Table-128 exact target (blog says ~25%).
+**✅ GAPPED-CONTRACT EARMARK (16 dead research instruments from the bootstrap) -> private/gapped_contracts_
+review.csv.** 13/16 are NOT lost exposure: SUPERSEDED variants we trade (GAS-LAST/GAS_US_mini->GAS_US,
+NASDAQ_mini->NASDAQ_micro, US3->US2/US5/US10 ladder), decomposable FX crosses (GBPEUR->GBP+EUR, YENEUR->
+JPY+EUR), or covered siblings (FTSECHINAH->FTSECHINAA+HANG, EU-TECH->EURO600+EU sectors, FEEDCOW->LIVECOW/
+LEANHOG). 3 REVIEW: BOVESPA (Brazil eq, stopped 2023-06 = recent, likely re-acquirable -- CHECK FIRST),
+EPRA-EUROPE (EU real estate, no direct peer), BRE (old EM FX). CONFIRM US-PROPERTY in 117 (covers US
+real-estate). Root cause = CSI mid-chain gaps / superseded codes, NOT mass delisting (task-#28 family).
+New tools: vol_shortfall_decomp.py. Research: rob_vol_targeting_research.md.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-16 — IDM CAP DECIDED (2.75) + PROD BOOK/GATE REFRESHED on 07-15)
 **✅ IDM CAP DECISION FINAL: dm_max = 2.75 (KEPT). No longer deferred.** First CLEAN matched comparison
 (both caps, SAME 117 universe + SAME 07-15 data; prior dm250-vs-dm275 was confounded by 106-vs-117):
