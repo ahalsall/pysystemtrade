@@ -152,8 +152,14 @@ def _bootstrap(pst):
     process_adjusted_prices_single_instrument(pst, ADD_TO_DB=True, ADD_TO_CSV=False)
 
 
-def reingest(pst, data, dp):
-    """Sync one instrument. Returns an outcome tag: incremental | bootstrap | roll-needed | skipped-*."""
+def reingest(pst, data, dp, force_bootstrap=False):
+    """Sync one instrument. Returns an outcome tag: incremental | bootstrap | roll-needed | skipped-*.
+
+    force_bootstrap (--bootstrap): deliberate from-scratch rebuild -- for a stale/gapped instrument
+    whose DB is years behind the raw data, where the incremental append can't bridge the gap. This is
+    the legitimate single-instrument use of build_and_write_roll_calendar (data.md sanctions it for
+    from-scratch/craftsmanship); the batch gen drops the last roll, so a fix_stuck_rolls review follows.
+    """
     from sysproduction.update_multiple_adjusted_prices import update_multiple_adjusted_prices_for_instrument
     csi_sym = PST2CSI.get(pst)
     if not csi_sym:
@@ -165,24 +171,23 @@ def reingest(pst, data, dp):
     init_db_with_split_freq_csv_prices_for_code(
         pst, get_resolved_pathname("private.data.futures.csi_ingest"), csv_config=_config_for(pst))
     # 2. extend multiple + adjusted
-    if has_multiple_prices(pst, dp):
-        try:
-            update_multiple_adjusted_prices_for_instrument(pst, data)  # INCREMENTAL, no roll calendar
-            print(f"  {pst}: +{staged} contract files -> incremental append (no roll calendar)", flush=True)
-            return "incremental"
-        except Exception as e:
-            msg = str(e)
-            if "roll" in msg.lower():
-                print(f"  {pst}: ROLL-NEEDED -- roll present in source but not registered; "
-                      f"run fix_stuck_rolls to advance (append not done)", flush=True)
-                return "roll-needed"
-            print(f"  {pst}: incremental FAILED ({type(e).__name__}: {msg[:70]})", flush=True)
-            return "error"
-    else:
+    if force_bootstrap or not has_multiple_prices(pst, dp):
         _bootstrap(pst)
-        print(f"  {pst}: +{staged} contract files -> BOOTSTRAP (first ingest; roll calendar built once)",
-              flush=True)
+        why = "forced" if force_bootstrap else "first ingest"
+        print(f"  {pst}: +{staged} contract files -> BOOTSTRAP ({why}; roll calendar built once)", flush=True)
         return "bootstrap"
+    try:
+        update_multiple_adjusted_prices_for_instrument(pst, data)  # INCREMENTAL, no roll calendar
+        print(f"  {pst}: +{staged} contract files -> incremental append (no roll calendar)", flush=True)
+        return "incremental"
+    except Exception as e:
+        msg = str(e)
+        if "roll" in msg.lower():
+            print(f"  {pst}: ROLL-NEEDED -- roll present in source but not registered; "
+                  f"run fix_stuck_rolls to advance (append not done)", flush=True)
+            return "roll-needed"
+        print(f"  {pst}: incremental FAILED ({type(e).__name__}: {msg[:70]})", flush=True)
+        return "error"
 
 
 def validate(pst, dp):
@@ -197,6 +202,7 @@ def main():
     from sysproduction.data.prices import diagPrices
     args = [a for a in sys.argv[1:]]
     dry = "--dry" in args
+    force_bootstrap = "--bootstrap" in args
     args = [a for a in args if not a.startswith("--")]
     if "--auto" in sys.argv or "--diff" in sys.argv:
         det = diff()
@@ -214,13 +220,15 @@ def main():
     if dry:
         print("dry-run: would sync", codes); return
 
-    print(f"\nSyncing {len(codes)} (incremental append; no roll-calendar regeneration): {codes}\n", flush=True)
+    mode = "FORCED BOOTSTRAP (from-scratch rebuild)" if force_bootstrap \
+        else "incremental append; no roll-calendar regeneration"
+    print(f"\nSyncing {len(codes)} ({mode}): {codes}\n", flush=True)
     data = dataBlob()
     dp = diagPrices(data)
     outcomes = {}
     done = []
     for c in codes:
-        tag = reingest(c, data, dp)
+        tag = reingest(c, data, dp, force_bootstrap=force_bootstrap)
         outcomes.setdefault(tag, []).append(c)
         if tag in ("incremental", "bootstrap"):
             done.append(c)
