@@ -6,6 +6,30 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-16 — PRODUCTION TARGET -> 25%; paper-trading next)
+**✅ PRODUCTION VOL TARGET CHANGED 20% -> 25%** (user decision: risk tolerance supports it). DELIBERATE
+ex-ante risk-appetite choice (Rob's own target), NOT chosen to max backtest Sharpe -- config yaml
+percentage_vol_target 20.0 -> 25.0 (source of truth; generator preserves it). Expected book (from VT25):
+Sharpe ~1.05, realised vol ~15% (RCF -> 61% of 25% target), maxDD ~-33%, ~19 held / gross ~24, leverage
+~3.6x (gate caps warn5/max8 still fine -- re-verify on refresh). NOTE all prior "20% (AFTS parity)"
+references are superseded for PRODUCTION; 20% analysis runs remain valid comparisons.
+**EXECUTION / ORDER TYPE (answered):** dynamic-opt generator emits `best`-type instrument orders ->
+allocate_algo_to_order routes them to `algoOriginalBest` (sysexecution/algos/algo_original_best.py = Rob's
+"world's simplest execution algo", blog qoppac 2014-10). Behaviour: PASSIVE LIMIT at the near touch first,
+escalate to AGGRESSIVE/market if (a) book imbalance favours us (>=5x our side & <3x qty other side), (b) 5-min
+passive timeout (PASSIVE_TIME_OUT 300s; TOTAL 600s), or (c) within 30min of close. SIZE_LIMIT=1 -> ONE CONTRACT
+AT A TIME, so multi-lot targets fill incrementally across CONTINUOUS run_stack_handler passes. Gates: needs
+LIVE streaming bid/ask (liquidity sizing; delayed data -> sizes to 0 -> nothing submits) + is_contract_okay_
+to_trade (liquid session hours). market_algo=algo_snaps, limit=algo_limit_orders, adaptive=algo_adaptive
+available; algo_overrides per-instrument (only example IRON set). => stack handler MUST run continuously in
+the liquid window to complete the book.
+**NEXT (paper, user away/OK):** on user's "CSI updated" -> csi_sync_reingest --auto (incremental) -> verify
+-> refresh prod book+gate at 25% -> tell user the liquid windows when orders go in -> schedule run_stack_
+handler per window (Gateway DU1739659 port 4002 UP, Read-Only OFF, TZ=UTC). Flatten/net the 4 stale 07-01
+positions in the first cycle.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-16 — VT25 comparison run; production STAYS 20%)
 **VT25 backtest ($250k / 25% vol / validated 117 config, dynamic-opt, comparison run -- did NOT overwrite
 production target_book).** -> private/backtest_runs/rob_dynamic_prod_250k_dm275_vt25/. Results vs 20% prod:
