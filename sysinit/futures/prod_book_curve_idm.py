@@ -45,11 +45,20 @@ _dm_override = os.environ.get("DM_MAX")
 if _dm_override:
     config.instrument_div_mult_estimate["dm_max"] = float(_dm_override)
     print(f"[DM_MAX override] dm_max -> {_dm_override} (comparison run; target_book NOT overwritten)", flush=True)
+# VOL_TARGET env overrides the annualised vol target for a COMPARISON run (e.g. 25% vs prod 20%).
+_vol_override = os.environ.get("VOL_TARGET")
+if _vol_override:
+    config.percentage_vol_target = float(_vol_override)
+    VOL = float(config.percentage_vol_target)
+    print(f"[VOL_TARGET override] vol_target -> {_vol_override}% (comparison run; target_book NOT overwritten)", flush=True)
+_comparison = bool(_dm_override or _vol_override)
 try:
     _dm = float(config.instrument_div_mult_estimate["dm_max"])  # label tracks the cap for side-by-side runs
 except Exception:
     _dm = FIXED_IDM
 LABEL = f"rob_dynamic_prod_250k_dm{int(round(_dm * 100))}"
+if _vol_override:
+    LABEL += f"_vt{int(round(VOL))}"
 n = len(config.instrument_weights)
 print(f"Building rob_dynamic PRODUCTION system from yaml: ${CAP:,.0f} / {VOL:.0f}% vol / "
       f"{n} instruments / estimated IDM (fixed fallback {FIXED_IDM})", flush=True)
@@ -122,8 +131,8 @@ today = pos.iloc[-1]; asof = pos.index[-1].date()
 tgt = today.round().astype(int); tgt = tgt[tgt != 0].sort_values()
 print(f"\n[BOOK] {len(tgt)} held / {n} universe | gross {int(tgt.abs().sum())} contracts (as of {asof})", flush=True)
 print(tgt.to_string(), flush=True)
-if _dm_override:
-    print(f"\n[comparison run dm_max={_dm_override}] target_book NOT overwritten; artifacts under {outdir}/", flush=True)
+if _comparison:
+    print(f"\n[comparison run {LABEL}] target_book NOT overwritten; artifacts under {outdir}/", flush=True)
 else:
     tgt.to_csv("private/target_book_250k.csv", header=["target_contracts"])
     print(f"\nsaved -> private/target_book_250k.csv  | all artifacts under {outdir}/", flush=True)

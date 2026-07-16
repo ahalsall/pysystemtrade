@@ -6,6 +6,26 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-16 — VT25 comparison run; production STAYS 20%)
+**VT25 backtest ($250k / 25% vol / validated 117 config, dynamic-opt, comparison run -- did NOT overwrite
+production target_book).** -> private/backtest_runs/rob_dynamic_prod_250k_dm275_vt25/. Results vs 20% prod:
+  20% (prod): Sharpe 0.918, vol 11.3%, maxDD -22.6%, avgDD -6.7%, skew -0.70, 13 held
+  25% (this): Sharpe 1.045, vol 15.2%, maxDD -33.1%, avgDD -9.1%, skew -0.66, 19 held
+RCF HOLDS: 25% target -> 15.2% realised = 61% of target (same conservative-estimator ratio) -> closer to
+Rob's 18.8-21% absolute vol, still under (by design). TWIST: Sharpe went UP (opposite of the fractional/
+large-cap gap experiment where 20->26 LOWERED Sharpe) because at $250k the 20% book is very SPARSE (13/117,
+heavy integer rounding -> many round to 0); 25% fills it out (19 held) -> better-diversified integer book.
+So a higher target counteracts integer-rounding sparsity at small capital. COST: maxDD -22.6%->-33.1%.
+CAVEAT (no-in-sample-fitting): do NOT switch to 25% BECAUSE Sharpe is higher (= fitting the target to P&L).
+25% is a legitimate EX-ANTE risk-appetite choice (Rob's own target + de-sparsifies our small-cap book) but
+its honest price is a -33% DD. PRODUCTION STAYS 20% unless deliberately decided. Tool: prod_book_curve_idm
+now has VOL_TARGET env override (labelled _vtNN comparison runs, no target_book overwrite). Compare plot:
+private/backtest_runs/compare_vt20_vs_vt25_250k.png. NO PRESSING ITEMS -> ready for: CSI download update ->
+csi_sync_reingest --auto (safe incremental) -> refresh order book for today/tomorrow -> schedule run_stack_
+handler paper fills in each instrument's liquid window (Gateway up, Read-Only OFF, TZ=UTC).
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-16 — VOL SHORTFALL CRACKED (RCF) + gapped-contract earmark)
 **✅ VOL SHORTFALL DEFINITIVELY EXPLAINED = Relative Correlation Factor (Rob's term).** Not a bug, not
 the cap, not lost universe exposure. Empirical decomposition (`vol_shortfall_decomp.py`, fractional
