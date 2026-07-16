@@ -6,6 +6,37 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-15 cont.2 — CSI SYNC TO 07-15 + ROB DIVERGENCE CLOSED)
+**✅ ROB DIVERGENCE FORMALLY CLOSED.** Apples-to-apples: OUR 117-universe rob_dynamic @ $250k/20%,
+period-split from saved daily P&L (`rob_benchmark_compare.py <label>`, reads saved run, no rebuild):
+  IN-BOOK <=2021 (Rob's AFTS era): **Sharpe 1.03** (vol 11.9%, maxDD -22.7%)  ~=  Rob AFTS Table 128
+    simulated dyn-opt **1.06** @$100k / **1.22** @$500k -> SAME risk-adjusted quality in his era.
+  FULL 1996-2026: 0.912 ; POST-BOOK >=2022 (drought): **-0.07** (vol 7.3%). => the full-period drop is
+  ENTIRELY the 2022-26 trend drought that POST-DATES his book; no system defect. The apparent
+  "divergence" was (a) comparing our BACKTEST to his LIVE curve (frictions/equity-hedge/evolving
+  system/diff universe+capital) and (b) that drought. Residual (his higher vol/capital) = his micro-rich
+  170-inst universe deploying more risk = benign, already diagnosed. DO NOT tune to close it (= fitting
+  to Rob; see notes/reference/in_sample_fitting_research.md + [[no-in-sample-fitting]]). Saved:
+  rob_dynamic_prod_250k_dm275/rob_comparison.json. NOTE: the rebuild-3-capitals design timed out (dyn-opt
+  curve ~40-60min/build); the saved-P&L split is the practical + valid method (Sharpe ~capital-invariant).
+**✅ CSI RE-INGEST TO 2026-07-15 + RIGOROUS VERIFY.** Fresh UA export (1294 CSVs) landed; re-ingested in
+3 passes (pass1 84/146 then timeout, pass2 the 50 universe stragglers, +US-UTILS). VERIFY: roll_calendar_
+audit -> 117 universe adjusted prices ALL fresh to 07-15; STALE=1 (SOFR only = benign STIR forward-dating
+false-positive, PRICE fresh); CARRY=PRICE=0. fix_stuck_rolls healed 32 universe instruments the BATCH
+reingest re-stranded (US-UTILS etc.) -- a live re-confirmation that csi_sync_reingest's per-instrument
+build_and_write_roll_calendar IS the batch anti-pattern (data.md:271 "not suited to a batch process";
+Rob: "can't fully automate rolling"). Sector indices IMPROVED: US-ENERGY/US-TECH/... now priced=Sep/
+fwd=Dec-2026 (fresh export carried their Dec forwards -> no longer stuck). DEFERRED: 20 non-universe
+research instruments (NOK/OMX/YENEUR/VNKI/BOVESPA...) still behind, don't gate anything.
+**NEXT (TOOL REDESIGN, agreed):** rewrite csi_sync_reingest to the INCREMENTAL model -- for NEW-ROWS just
+append prices + extend multiple/adjusted WITHOUT regenerating the roll calendar; only touch rolls on a
+genuine NEW-CONTRACT event (like production update_multiple_adjusted_prices). Ends the batch-then-
+fix_stuck_rolls cycle. Also: TARGET_BOOK/gate were on 07-07 data -> optionally refresh prod book on 07-15
+data (Sharpe/DD ~unchanged over 30y). New tools this session: plot_saved_run.py (committed),
+rob_benchmark_compare.py.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-15 cont. — 117 CONFIRMED + GATE PASS; infra + research)
 **✅ 117-INST REBUILD CONFIRMED (was IN FLIGHT).** job bm5cuajvi completed; artifacts under
 `private/backtest_runs/rob_dynamic_prod_250k_dm275/` (stats.json universe=117): **Sharpe 0.912,
