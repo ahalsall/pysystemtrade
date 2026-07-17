@@ -6,6 +6,35 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-17 — PAPER EXEC BLOCKED: prod order path 9 vs target book 19; NOT submitted)
+**PAPER FILLS HELD — nothing submitted, all stacks clean, no broker action.** Went to place the 25%
+book via the production path and caught TWO issues before any order hit IB:
+1. **FIXED: production capital was stale $150k** (from 06-30 init), not the config $250k. The prod order
+   path OVERWRITES config capital with the live STRATEGY capital (run_dynamic_optimised_system.py:59), so
+   run_systems/order-gen optimised at $150k. Reset via dataCapital.create_initial_capital(250000,...
+   are_you_really_sure=True) + update_strategy_capital -> total & rob_dynamic strategy capital = $250k
+   (verified). Re-ran run_systems at $250k.
+2. **OPEN/BLOCKER: canonical production order generator produces a 9-position book vs our prod_book_curve_
+   idm/gate 19-position book, same $250k/25%.** Production optimizer is HEALTHY (no all-zeros/freeze/NaN/
+   exception). Difference = the two dyn-opt paths use DIFFERENT INPUTS: production (dynamic_optimised_
+   positions.py get_data_for_objective_instance) builds per_contract_value + covariance + speed_control at
+   ORDER TIME; prod_book_curve_idm uses the sim System's optimisedPositions stage (sim-internal data).
+   Production book (AEX+1 AUD+1 BITCOIN-2 DOW+3 EU-OIL+1 KOSDAQ-1 KR10-1 SHATZ-2 TOPIX+1) deploys MATERIALLY
+   LESS than a 25% target should (backtest holds 19) -> either prod path correctly conservative on real
+   current prices, OR an input discrepancy under-deploying. NOT pinned. DID NOT SUBMIT.
+   **NEXT (focused ~30min):** compare per_contract_value, covariance diagonal, speed_control/shadow_cost
+   between the two paths for diverging instruments (drop-outs BBCOMM/EUR_micro/VIX/US2/US5/CAD/CORN/MSCISING/
+   MXP/RUSSELL/SP500_micro/SUGAR11 vs new AEX/KOSDAQ/KR10/TOPIX). Likely price-basis (order-time current vs
+   sim) or covariance snapshot. Pin the driver -> decide which path is authoritative -> submit VERIFIED book.
+**PRE-REQS CONFIRMED:** Gateway up (paper DU1739659, port 4002), Read-Only OFF, market data LIVE, broker==DB
+reconciliation clean; 4 stale 07-01 positions still open (AUD/GOLD_micro/JPY -1, SP500_micro +1) to net.
+**PRESERVED:** capital $250k, CSI synced to 2026-07-16 (72 universe incremental, clean), config 25%,
+run_systems stored fresh $250k optimal positions (raw store 117). Order-gen invocation:
+strategyRunner(data,'rob_dynamic','run_strategy_order_generator','get_and_place_orders').run_strategy_method().
+Standing schedule NOT installed (deferred until one clean verified cycle). Target Monday windows.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-16 — PRODUCTION TARGET -> 25%; paper-trading next)
 **✅ PRODUCTION VOL TARGET CHANGED 20% -> 25%** (user decision: risk tolerance supports it). DELIBERATE
 ex-ante risk-appetite choice (Rob's own target), NOT chosen to max backtest Sharpe -- config yaml
