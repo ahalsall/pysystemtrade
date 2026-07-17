@@ -6,6 +6,37 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-17 — 9-vs-19 RESOLVED: NO BUG, prod 9-book is cost-optimal)
+**✅ RESOLVED. The production order path is CORRECT; our prod_book_curve_idm 19-book was the outlier.**
+Scored both books under the production greedy objective (evaluate = tracking_error_in_risk_space + trade
+costs; lower=better; /tmp/score_books.py):
+  PROD 9-book:      objective 0.0674  track_err 0.0543  costs 0.0131  held 11   <-- BEST
+  OUR 19-book:      objective 0.0768  track_err 0.0494  costs 0.0274  held 19
+  continuous opt:   objective 0.1380  track_err 0.0000  costs 0.1380  held 116
+The 19-book tracks marginally better but costs 2x to trade into from our near-flat start; the greedy
+correctly holds 11 (DOW+3 covering the equity basket vs many small correlated micros) = cost-optimal FIRST
+step. This is Rob's shadow_cost (50) GRADUAL-DEPLOYMENT by design: production trades toward the ~19
+steady-state over subsequent daily runs (cost term shrinks once deployed). prod_book_curve_idm shows the
+STEADY-STATE (already-deployed) book -> misleading as a same-day target (ignores the cost of getting there
+in one step). => PST-origin optimizer is correct (as user predicted); the gap was our inspection script.
+**SOFR REVERSED: removal was UNNECESSARY.** The 9-book was IDENTICAL with and without SOFR -> its NaN was
+auto-handled by the optimizer's keys_with_valid_data filtering, never caused the 9-vs-19. Restored SOFR
+(config 117, vol 25%; raw-store file moved back). SOFR earmark (deferred, benign): why the production
+covariance estimator returns NaN for SOFR (roll -1000 INTENTIONAL per Rob, NOT the bug) -- auto-handled so
+harmless, but investigate the estimator window/NaN-robustness eventually. NIKKEI400<->TOPIX 0.990 = near-dup.
+**PRODUCTION BOOK IS SUBMITTABLE.** The correct today's trade = the production 9/11-book (optimise_positions:
+AEX+1 BITCOIN-2 DOW+3 EU-OIL+1 GOLD_micro-1 JPY-1 KOSDAQ-1 KR10-1 SHATZ-2 SP500_micro+1 TOPIX+1), which nets
+the 4 stale 07-01 positions and deploys further over subsequent daily runs. NEXT: confirm submission timing
+(today US 15:00 UTC vs Monday) -> run_strategy_order_generator -> run_stack_handler (continuous, liquid
+window, Gateway up/Read-Only OFF/TZ=UTC) -> fills; then install the standing daily schedule (now that a
+clean verified cycle is understood). GOTCHA to remember: production uses live STRATEGY capital (was stale
+$150k, FIXED to $250k); prod_book_curve_idm uses config capital -- keep them aligned.
+**PRESERVED:** capital $250k, CSI 2026-07-16, config 25%/117, Gateway up/data live/recon clean, stacks
+empty, 4 stale 07-01 positions open, nothing submitted. Diagnostics: /tmp/{score_books,opt_inputs_diag,
+cov_diag,nan_inst}.py. Config backup: config.yaml.bak_presofr.
+
+--- (prior, RESOLVED above) ---
+
 ## ⏱ RESUME HERE (2026-07-17 — 9-vs-19 STILL OPEN; SOFR/NaN was NOT the cause (corrected))
 **HONEST CORRECTION: SOFR NaN covariance was a RED HERRING for the 9-vs-19.** Pinned that the production
 order-time covariance had a NaN variance for SOFR (the lone STALE STIR; RollOffset -1000 is INTENTIONAL per
