@@ -76,9 +76,9 @@ print(f"  Calmar {calmar:.2f}   time-in-DD {time_in_dd:.0f}%   avg DD {avg_dd:.1
 print(f"  best yr {best_y[0]:.1f}% ({best_y[1]})   worst yr {worst_y[0]:.1f}% ({worst_y[1]})")
 
 # ================= PLOT =================
-fig = plt.figure(figsize=(13, 9.5))
-gs = fig.add_gridspec(3, 1, height_ratios=[3.0, 1.15, 1.15], hspace=0.28)
-a1 = fig.add_subplot(gs[0]); a2 = fig.add_subplot(gs[1], sharex=a1); a3 = fig.add_subplot(gs[2], sharex=a1)
+fig = plt.figure(figsize=(13, 8.5))
+gs = fig.add_gridspec(2, 1, height_ratios=[3.0, 1.25], hspace=0.22)
+a1 = fig.add_subplot(gs[0]); a2 = fig.add_subplot(gs[1], sharex=a1)
 
 fig.suptitle(f"rob_dynamic (Carver-style trend+carry, dynamic-opt) — {stats.get('universe','?')} futures, "
              f"${cap:,.0f} @ {stats.get('vol_target','?')}% vol target\n"
@@ -101,7 +101,6 @@ box = "\n".join([
     f"skew                 {skew:.2f}",
     f"Max DD (compounded)  {maxdd_comp:.1f}%",
     f"Max DD (month-end)   {maxdd_m:.1f}%",
-    f"Max DD (PST additive){maxdd_add:.1f}%",
     f"Calmar               {calmar:.2f}",
     f"time in drawdown     {time_in_dd:.0f}%",
     f"best year            {best_y[0]:.1f}% ({best_y[1]})",
@@ -112,19 +111,12 @@ box = "\n".join([
 a1.text(0.013, 0.985, box, transform=a1.transAxes, va="top", ha="left", family="monospace",
         fontsize=8.3, bbox=dict(boxstyle="round", fc="#eef4fb", ec="#08519c", alpha=0.92))
 
-# TYPICAL drawdown (compounded, %-of-peak)
+# drawdown (compounded, %-of-peak) -- the fund/industry convention
 a2.fill_between(dd_comp.index, dd_comp.values, 0, color="#d62728", alpha=0.55)
 a2.axhline(maxdd_comp, color="#7a0000", lw=0.8, ls="--")
-a2.set_ylabel("drawdown %\n(TYPICAL: compounded,\n%-of-peak)"); a2.grid(alpha=0.3)
+a2.set_ylabel("drawdown %\n(compounded, %-of-peak)"); a2.set_xlabel("date"); a2.grid(alpha=0.3)
 a2.text(0.013, 0.08, f"Max {maxdd_comp:.1f}%  (fund convention; month-end NAV {maxdd_m:.1f}%)",
         transform=a2.transAxes, fontsize=8.5, color="#7a0000")
-
-# PST additive drawdown
-a3.fill_between(dd_add.index, dd_add.values, 0, color="#6a51a3", alpha=0.5)
-a3.axhline(maxdd_add, color="#3f007d", lw=0.8, ls="--")
-a3.set_ylabel("drawdown %\n(PST: additive\ncumsum/fixed cap)"); a3.set_xlabel("date"); a3.grid(alpha=0.3)
-a3.text(0.013, 0.08, f"Max {maxdd_add:.1f}%  (pysystemtrade-native; = stats.json max_dd_pct)",
-        transform=a3.transAxes, fontsize=8.5, color="#3f007d")
 
 png = os.path.join(d, f"factsheet_{int(START)}.png")
 fig.savefig(png, dpi=120, bbox_inches="tight"); plt.close(fig)
