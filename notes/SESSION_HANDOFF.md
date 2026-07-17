@@ -6,6 +6,30 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-17 — FIRST 25% PAPER FILLS ACHIEVED; clean; standing schedule = next)
+**✅ MILESTONE: real paper fills through the full production chain at 25%/$250k.** Order-gen (9-book) ->
+instrument->contract->broker->IB->fills. In the live US window (18:20 UTC Fri): FILLED to target BITCOIN -2,
+DOW +3, AUD 0 (flatten) + kept SP500_micro+1/GOLD_micro-1/JPY-1. EU/Asia names (EU-OIL/AEX/SHATZ/KOSDAQ/
+KR10/TOPIX) NOT filled (markets closed) -> Monday.
+**LESSON (my error, corrected): NEVER run overlapping manual submitters.** I ran a manual single-pass +
+a fill-loop; the best-exec algo's passive limits filled at IB but were marked 'cancelled' locally -> DB
+missed fills -> loop re-submitted -> OVER-FILLED DOW (+4 vs +3) and AUD (+1 vs 0). Caught it (monitoring),
+cancelled all IB open orders, then CORRECTED with 2 precise raw-ib MKT SELLs (DOW MYM/20260918 @52376 ->+3;
+AUD/20260914 @0.69735 ->0). => The robust systemd run_stack_handler (single continuous manager, full algo
+lifecycle, no double-submit) is the RIGHT mechanism; manual passes are hazardous.
+**CLEAN END STATE:** IB positions = target (DOW+3 BITCOIN-2 SP500_micro+1 GOLD_micro-1 JPY-1, AUD flat);
+DB == broker on quantities (only cosmetic contract-date label diff month-code-vs-exact-expiry, known,
+harmless); ALL stacks empty (instrument/contract/broker=0); no lingering IB orders.
+**NEXT (standing schedule -- do CAREFULLY, its own task):** the full Phase-D daily automation = csi_sync
+(incremental) -> run_systems -> order-gen -> ONE continuous run_stack_handler per liquid window (systemd
+--user, TZ=UTC, mirror pst-ib-intraday units; needs process-control GO + times). This is what fills EU/Asia
+Monday + keeps deploying toward steady-state. Prereqs each fire: Gateway up, Read-Only OFF, no competing
+session. GOTCHA: capital = live STRATEGY capital (keep at $250k; was stale $150k, fixed). Deploy is GRADUAL
+by shadow_cost (today's 9-book -> ratchets toward ~19 over daily runs; see 9-vs-19 resolution below).
+**PRESERVED:** capital $250k, CSI 07-16, config 25%/117 (SOFR restored), reconciliation clean.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-17 — 9-vs-19 RESOLVED: NO BUG, prod 9-book is cost-optimal)
 **✅ RESOLVED. The production order path is CORRECT; our prod_book_curve_idm 19-book was the outlier.**
 Scored both books under the production greedy objective (evaluate = tracking_error_in_risk_space + trade
