@@ -6,6 +6,35 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-17 — 9-vs-19 STILL OPEN; SOFR/NaN was NOT the cause (corrected))
+**HONEST CORRECTION: SOFR NaN covariance was a RED HERRING for the 9-vs-19.** Pinned that the production
+order-time covariance had a NaN variance for SOFR (the lone STALE STIR; RollOffset -1000 is INTENTIONAL per
+Rob, so NOT the roll config) poisoning w'Sigma w. Excluded SOFR (removed from config instrument_weights/
+forecast/fdm -> 116; AND moved raw-store file aside: private/data/parquet/_optimal_positions_removed/
+'rob_dynamic_raw SOFR.parquet'). Covariance now CLEAN (0 NaNs, verified). BUT the production optimizer STILL
+produces the SAME non-tracking 9-book (DOW+3 vs optimal +1.2, EUR_micro 0 vs optimal -2.55). So the NaN was
+real+worth fixing but is NOT the cause of 9-vs-19. RULED OUT now: capital (fixed $250k), SOFR, NaN covariance.
+**STILL OPEN: production greedy optimizer produces 9 positions that DON'T track its own optimal weights,
+while sim optimisedPositions (prod_book_curve_idm) tracks them (19).** Two hypotheses, undistinguished:
+(1) a real INPUT difference -- per_contract_value (production current-price vs sim) or the COST term feeding
+the objective; (2) the 9-book is actually CORRECT -- production optimizer is cost-aware and may hold fewer,
+larger, RISK-EQUIVALENT positions (extra DOW covering equity basket vs many micros), and prod_book over-counts
+by not applying costs identically. previous_positions = the 4 stale broker (SP500_micro+1,JPY/GOLD/AUD-1),
+expected, not the cause. speed_control standard (shadow 50, buffer 0.0125).
+**NEXT (careful, next session, NOT rushed):** side-by-side the TWO optimizers' full INPUTS + OUTPUTS --
+per_contract_value, costs, covariance, previous_positions, AND the raw optimised result -- production
+(dynamic_optimised_positions.get_data_for_objective_instance) vs sim (optimisedPositions stage). Determine
+if 9-book is correct (cost-aware sparsity) or an input bug. Diagnostics saved: /tmp/opt_inputs_diag.py,
+/tmp/cov_diag.py, /tmp/nan_inst.py. NOT submitted; stacks clean. Config backup: config.yaml.bak_presofr.
+**SOFR earmark (deferred, refined):** roll -1000 INTENTIONAL (Rob) -> NOT the bug; real Q = why the
+production covariance estimator returns NaN for SOFR when the sim path handles it (window/NaN-robustness in
+get_covariance_matrix_for_instrument_returns_for_optimisation). Also NIKKEI400<->TOPIX corr 0.990 = near-dup
+(duplicate_instruments cleanup eventually).
+**PRESERVED:** capital $250k, CSI 2026-07-16, config 25% (now 116 w/o SOFR), Gateway up/data live/recon clean,
+4 stale 07-01 positions open. Standing schedule NOT installed. Target Monday.
+
+--- (prior, SUPERSEDED where noted) ---
+
 ## ⏱ RESUME HERE (2026-07-17 — PAPER EXEC BLOCKED: prod order path 9 vs target book 19; NOT submitted)
 **PAPER FILLS HELD — nothing submitted, all stacks clean, no broker action.** Went to place the 25%
 book via the production path and caught TWO issues before any order hit IB:
