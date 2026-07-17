@@ -6,6 +6,34 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-17 — STANDING DAILY SCHEDULE WIRED + ENABLED)
+**✅ STANDING DAILY PAPER-TRADING SCHEDULE LIVE (systemd --user, Linger=yes, first fire Mon 2026-07-20).**
+Two timers (Mon-Fri, UTC), canonical processes, deliberate broker/non-broker split:
+  pst-rob-refresh.timer      00:20 UTC -> rob_daily_refresh.py: csi_sync --auto -> run_systems (rob_dynamic,
+                             $250k optimal positions) -> order-gen (stage instrument orders). NOT broker-facing.
+  pst-rob-stackhandler.timer 00:30 UTC -> `python -m sysproduction.run_stack_handler` = the CANONICAL single
+                             continuous broker manager (Rob's tested processToRun; full order-lifecycle, NO
+                             double-submit); runs to its 19:45 UTC stop, self-gates per instrument hours.
+                             THE ONLY broker-facing component (last-night's over-fill lesson: never overlapping
+                             submitters -> exactly one continuous handler).
+Set run_systems/run_strategy_order_generator/run_stack_handler status = GO (dataControlProcess; persisted).
+Unit files: ~/.config/systemd/user/pst-rob-{refresh,stackhandler}.{service,timer} (NOT in repo; contents
+mirror pst-ib-intraday). Refresh wrapper committed: sysinit/futures/rob_daily_refresh.py.
+**OPERATIONAL PREREQS each trading day (00:30-19:45 UTC):** machine AWAKE + IB Gateway UP (paper DU1739659
+port 4002) + Read-Only OFF + no competing IB session. Stack handler FAILS CLEAN (Restart=no) if Gateway down
+-> rerun `systemctl --user start pst-rob-stackhandler.service` once up. CSI freshness depends on the UA VM
+export (user-driven); csi_sync ingests whatever's current (T-1 fine). LAPTOP SUSPEND is the real fragility
+(Persistent catches the refresh up but a missed live window can't backfill) -> production = always-on box.
+DISABLE: `systemctl --user disable --now pst-rob-refresh.timer pst-rob-stackhandler.timer`.
+**BEHAVIOUR:** each day order-gen computes trades vs CURRENT positions -> stack handler fills -> ratchets
+toward the ~19 steady-state (shadow_cost gradual deployment). Monday: fills the EU/Asia names + adjusts US.
+Today's positions (already filled, at target): BITCOIN-2 DOW+3 SP500_micro+1 GOLD_micro-1 JPY-1, AUD flat.
+**NEXT / watch:** Monday verify the first auto-cycle (journalctl --user -u pst-rob-refresh / -stackhandler);
+overlay my checks when in-session. Earmarks still open: SOFR covariance-estimator NaN (benign, auto-handled),
+NIKKEI400<->TOPIX 0.990 near-dup. Optional safety: wire reconciliation_gate as a pre-order precondition.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-17 — FIRST 25% PAPER FILLS ACHIEVED; clean; standing schedule = next)
 **✅ MILESTONE: real paper fills through the full production chain at 25%/$250k.** Order-gen (9-book) ->
 instrument->contract->broker->IB->fills. In the live US window (18:20 UTC Fri): FILLED to target BITCOIN -2,
