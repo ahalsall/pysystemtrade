@@ -6,30 +6,31 @@
 
 ---
 
-## ⏱ RESUME HERE (2026-07-17 — SOFR RESOLVED: CSI SR3 export gap; excluded w/ reopen condition)
-**✅ SOFR ROOT-CAUSED + RESOLVED (our side).** The order-time covariance NaN for SOFR = a DATA-within-CSV
-gap, confirmed by auditing the raw export CSVs (private/data/futures/csi/UA/Data/PST/SR3_*.csv, all 394):
-SOFR=CSI SR3 (CME 3m SOFR, quarterly IMM, roll -1000 INTENTIONAL per Rob). The DEFERRED quarterly chain is
-FROZEN at 2023-04-14 (deep-history one-time batch), while only the front quarterly (202606) + monthly serials
-+ far forwards get the ongoing refresh -> the back-adjusted series has a 1183-day gap (2023-04 -> 2026-07)
--> NaN variance -> optimiser auto-drops SOFR. NOT whole contracts missing (CSVs exist); NOT a roll/PST bug.
-Verified in-CSV: SR3_202609.csv trades in size on 2023-04-14 then 0 rows after; staged copy identical cutoff.
-CONFIRMED a UA EXPORT-config gap (NOT a CSI data gap): CSI catalog commodityfactsheet.csv shows SR3 active,
-EndDate 2026-07-06, LastVol 2,297,695 -> CSI HAS current data; the UA SR3 portfolio just isn't maintaining
-the deferred quarterly IMM chain past the one-time deep batch. So the fix is a UA re-export (user action);
-the exclusion is only an interim workaround, NOT the fix.
-**FIX SPEC (user action): notes/reference/sofr_sr3_reexport_spec.md** -- re-export the 29 frozen SR3 quarterly
-contracts (202603/09/12, 202703...203012) with current end dates; extend the ongoing UA SR3 export to include
-the FULL deferred quarterly IMM chain (else it recurs). Then csi_sync_reingest SOFR --bootstrap -> continuous
-series -> re-include.
-**EXCLUSION (our side, done): explicit + regeneration-safe.** private/systems/rob_dynamic/instrument_
-exclusions.yaml (SOFR + reason + reopen_when); make_rob_dynamic_config.py now drops exclusions from the 3
-instrument-derived blocks on every regen (EXCLUSIONS const + logic, mirrors instrument_additions.yaml).
-Applied to live config: universe 117 -> **116** (SOFR out), vol 25% preserved; SOFR raw optimal-position
-record moved to private/data/parquet/_optimal_positions_excluded/. VERIFIED: order-time covariance now CLEAN
-(116x116, 0 NaNs). Data-quality exclusion (ex-ante, not P&L; see [[no-in-sample-fitting]]).
-**REOPEN CONDITION:** CSI SR3 re-export done -> delete SOFR from instrument_exclusions.yaml + re-add to config.
-NB: the standing daily refresh runs run_systems on the 116 config (SOFR excluded) automatically.
+## ⏱ RESUME HERE (2026-07-17 — SOFR: IB-splice fix PREPARED + VERIFIED; DB rebuild HELD for sign-off)
+**Diagnosis (final):** SOFR=CSI SR3. A CONTIGUOUS BAND of quarterly (HMUZ) contracts **202309..203212** is
+frozen at exactly **2023-04-14** in the CSI export; serials + newer far quarterlies (203303+) stay current.
+Roll -1000 (INTENTIONAL per Rob) holds a ~2.7yr-deferred leg -> 1183-day gap -> NaN covariance -> auto-drop.
+**CSI RE-EXPORT = DEAD END (confirmed):** user re-exported SR3 in UA w/ "all contracts"; band still stops at
+2023-04-14, and UA's own contract view stops there too -> CSI genuinely doesn't serve these individual deferred
+legs past 2023-04-14 (catalog EndDate 2026-07-06 is the front/continuous, not the deferred legs). Vendor artifact.
+**FIX = IB-tail splice (VERIFIED, prepared):** IB has full daily history for every still-listed leg (202406+)
+back to 2020-07-20; on 2023-04-14 IB close == CSI close TO THE TICK -> clean seam; ~832 rows fill 2023-04-17->today.
+Seam-check (`ib_sofr_splice` report): **33 spliceable (all seam 0.0000), 3 unavailable** (202309/312/403 expired,
+IB secdef-purged) which are IMMATERIAL (only priced ~2020-21 where CSI is complete). Read-only probes:
+sysinit/futures/ib_sofr_{probe,depth_probe,overlap_check}.py.
+**DURABLE mechanism (survives every csi_sync):** raw UA/Data/PST CSVs are csi-owned + re-frozen each sync, so
+we DON'T write there. Active repair store `private/data/futures/ib_repair_tails/SOFR_<ym>.csv` (post-freeze IB
+rows) is overlaid by a generic `_ib_repair_tail` HOOK in csi_sync_reingest.stage() on EVERY sync (no-op for any
+instrument w/o a repair file; unit-tested). `sysinit/futures/ib_sofr_splice.py` populates it (report=inert cache
+in sofr_ib_repair/; --rebuild=activate + real reingest(force_bootstrap) via the hook).
+**HELD FOR SIGN-OFF (nothing ingested; ib_repair_tails/ empty -> hook is a no-op):** on "go":
+  `uv run python -m sysinit.futures.ib_sofr_splice --rebuild --use-cache`  (cache pre-populated, 33 tails)
+  -> fix_stuck_rolls SOFR review -> verify adj-price max gap normal -> DELETE SOFR from instrument_exclusions.yaml
+  -> regen config (**116 -> 117**) -> confirm order-time covariance finite SOFR variance. Steps in the spec.
+**Exclusion still active (interim):** private/systems/rob_dynamic/instrument_exclusions.yaml (SOFR); live config
+116 (SOFR out), vol 25%. make_rob_dynamic_config.py drops exclusions on every regen. Data-quality (ex-ante, not
+P&L; [[no-in-sample-fitting]]). Merge-safe: only additive files + a hook in OUR csi_sync_reingest.py ([[keep-upstream-core-unmodified]]).
+**Full detail: notes/reference/sofr_sr3_reexport_spec.md** (retitled; documents the dead-end + IB-splice + hook).
 
 --- (prior) ---
 

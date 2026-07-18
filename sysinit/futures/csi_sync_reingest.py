@@ -46,6 +46,10 @@ from sysinit.futures.csi_pipeline import (
 UA_DIR = "private/data/futures/csi/UA/Data/PST"
 STAGED = get_resolved_pathname("private.data.futures.csi_ingest")
 RCP = DEFAULT_ROLL_CALENDAR_PATH
+# durable per-contract IB-tail repair store: extends a frozen vendor feed to current. Applied by stage()
+# on every sync, so a re-frozen vendor export can't undo it. File: <PST>_<YYYYMM>.csv, raw body rows.
+# Populated by sysinit.futures.ib_sofr_splice (SOFR deferred quarterly legs CSI orphaned at 2023-04-14).
+IB_REPAIR = "private/data/futures/ib_repair_tails"
 PST2CSI = {r[1]: r[0] for r in _csv.reader(open("private/data/futures/csi_symbol_map.csv"))
            if r and r[0] != "csi_symbol"}
 
@@ -80,15 +84,38 @@ def db_adj_last(pst, dp):
     return _DB_ADJ[pst]
 
 
+def _ib_repair_tail(pst, yyyymm, body):
+    """If a durable IB-repair tail exists for this contract (IB_REPAIR/<pst>_<yyyymm>.csv), return its
+    rows strictly AFTER the last date already in `body` -- extending a frozen vendor contract to current.
+    Generic no-op for any contract without a repair file. See sysinit.futures.ib_sofr_splice."""
+    fp = os.path.join(IB_REPAIR, f"{pst}_{yyyymm}.csv")
+    if not os.path.exists(fp):
+        return ""
+    last = None
+    for ln in reversed(body.splitlines()):
+        if ln.strip() and not ln.lower().startswith("time,"):
+            last = ln.split(",")[0]; break
+    out = [ln for ln in open(fp).read().splitlines()
+           if ln.strip() and (last is None or ln.split(",")[0] > last)]
+    return ("\n".join(out) + "\n") if out else ""
+
+
 def stage(pst, csi_sym):
-    """Stage all raw contract files for one instrument into csi_ingest (idempotent)."""
+    """Stage all raw contract files for one instrument into csi_ingest (idempotent).
+    Applies the durable IB-tail repair overlay so a re-frozen vendor export can't undo the fix."""
     os.makedirs(STAGED, exist_ok=True)
     n = 0
     for yyyymm, src in raw_files(csi_sym).items():
         dst = os.path.join(STAGED, f"Day_{pst}_{yyyymm}00.csv")
         body = open(src).read()
         header = "" if body.lstrip().lower().startswith("time,") else CSI_HEADER
-        open(dst, "w").write(header + body)
+        out = header + body
+        tail = _ib_repair_tail(pst, yyyymm, body)      # extend frozen vendor legs to current (no-op if none)
+        if tail:
+            if out and not out.endswith("\n"):
+                out += "\n"
+            out += tail
+        open(dst, "w").write(out)
         n += 1
     return n
 
