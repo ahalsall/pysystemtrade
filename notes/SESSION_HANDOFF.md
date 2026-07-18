@@ -6,7 +6,26 @@
 
 ---
 
-## ⏱ RESUME HERE (2026-07-17 — SOFR: IB-splice fix PREPARED + VERIFIED; DB rebuild HELD for sign-off)
+## ⏱ RESUME HERE (2026-07-17 — SOFR: ✅ FIXED via IB-splice; rebuilt, re-included, 117, VERIFIED)
+**✅ DONE (signed off + executed).** ib_sofr_splice --rebuild activated the repair store (33 tails) + ran
+reingest(force_bootstrap) through the hooked stage(). Results VERIFIED:
+- SOFR adjusted prices 1996-07-03 -> **2026-07-17**, gap-free (**max gap 4 days**, was ~1183); 2023->today
+  max gap 4d over 904 rows. Priced 20290600 / fwd 20290900 (correct ~2.7yr-deferred leg for -1000 offset).
+- Private roll calendar (private/data/futures/roll_calendars_csv/SOFR.csv) current: last roll 2026-07-17 ->
+  20290600, matches DB priced. NOT roll-stuck. (roll_calendar_audit flags TRUNC because it reads the STALE
+  upstream data/futures/roll_calendars_csv/SOFR.csv (2021 sample), not our private RCP -- cosmetic tool quirk,
+  affects all instruments, left alone = upstream.)
+- Re-included: SOFR removed from instrument_exclusions.yaml; config regenerated with EXPLICIT 117 universe
+  (current 116 + SOFR) to avoid drift (no-args regen would wrongly add 16 unvetted instruments). Diff vs 116
+  backup = EXACTLY +SOFR in all 3 blocks; static params preserved (25% vol, $250k, dm 2.75); SOFR weights ==
+  Rob's fit. **Universe 116 -> 117.**
+- Order-time optimiser (optimiser_input_check, $250k): SOFR variance **0.000070 (finite, no NaN, no FLAG)**,
+  valid target -11.33 contracts. The original auto-drop symptom is GONE.
+DURABLE: _ib_repair_tail hook in csi_sync_reingest.stage() re-overlays the IB tails on every csi_sync, so a
+re-frozen CSI export can't undo it. SOFR is now a normal healthy instrument in the daily pipeline.
+Committed: 8a789e15 (tools+hook). (config.yaml + exclusions.yaml are gitignored private/.)
+
+### (superseded) SOFR IB-splice prep — HELD-for-sign-off notes
 **Diagnosis (final):** SOFR=CSI SR3. A CONTIGUOUS BAND of quarterly (HMUZ) contracts **202309..203212** is
 frozen at exactly **2023-04-14** in the CSI export; serials + newer far quarterlies (203303+) stay current.
 Roll -1000 (INTENTIONAL per Rob) holds a ~2.7yr-deferred leg -> 1183-day gap -> NaN covariance -> auto-drop.
