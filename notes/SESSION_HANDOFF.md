@@ -14,8 +14,10 @@ FROZEN at 2023-04-14 (deep-history one-time batch), while only the front quarter
 + far forwards get the ongoing refresh -> the back-adjusted series has a 1183-day gap (2023-04 -> 2026-07)
 -> NaN variance -> optimiser auto-drops SOFR. NOT whole contracts missing (CSVs exist); NOT a roll/PST bug.
 Verified in-CSV: SR3_202609.csv trades in size on 2023-04-14 then 0 rows after; staged copy identical cutoff.
-CSI almost certainly HAS the data (contracts trade to expiry) -> it's a UA EXPORT-config gap (deferred
-quarterly chain not pulled past the deep batch).
+CONFIRMED a UA EXPORT-config gap (NOT a CSI data gap): CSI catalog commodityfactsheet.csv shows SR3 active,
+EndDate 2026-07-06, LastVol 2,297,695 -> CSI HAS current data; the UA SR3 portfolio just isn't maintaining
+the deferred quarterly IMM chain past the one-time deep batch. So the fix is a UA re-export (user action);
+the exclusion is only an interim workaround, NOT the fix.
 **FIX SPEC (user action): notes/reference/sofr_sr3_reexport_spec.md** -- re-export the 29 frozen SR3 quarterly
 contracts (202603/09/12, 202703...203012) with current end dates; extend the ongoing UA SR3 export to include
 the FULL deferred quarterly IMM chain (else it recurs). Then csi_sync_reingest SOFR --bootstrap -> continuous
