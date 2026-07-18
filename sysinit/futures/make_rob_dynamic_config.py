@@ -29,6 +29,7 @@ ROB_CFG = "systems/provided/rob_system/config.yaml"
 OUT_DIR = "private/systems/rob_dynamic"
 OUT = os.path.join(OUT_DIR, "config.yaml")
 ADDITIONS = os.path.join(OUT_DIR, "instrument_additions.yaml")  # instruments beyond Rob's set (inherit a donor's fit)
+EXCLUSIONS = os.path.join(OUT_DIR, "instrument_exclusions.yaml")  # instruments removed on data-quality grounds (each with a reason + reopen condition)
 
 # the ONLY blocks this script regenerates; every other key is preserved from the existing yaml
 INSTRUMENT_DERIVED_KEYS = ["instrument_weights", "forecast_weights", "forecast_div_multiplier"]
@@ -84,6 +85,20 @@ def main():
             added.append(new_inst)
     if added:
         print(f"additions merged ({len(added)}, inherit donor fit): {sorted(added)}")
+
+    # remove EXCLUSIONS (data-quality removals) from every instrument-derived block, so they stay out
+    # across regenerations. Each entry documents a reason + reopen condition. See instrument_exclusions.yaml.
+    excluded = []
+    if os.path.exists(EXCLUSIONS):
+        for inst, spec in (yaml.safe_load(open(EXCLUSIONS)) or {}).items():
+            hit = False
+            for key in INSTRUMENT_DERIVED_KEYS:
+                if inst in cfg.get(key, {}):
+                    del cfg[key][inst]; hit = True
+            if hit:
+                excluded.append(inst)
+    if excluded:
+        print(f"exclusions applied ({len(excluded)}, data-quality): {sorted(excluded)}")
 
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(OUT, "w") as f:

@@ -6,6 +6,31 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-17 — SOFR RESOLVED: CSI SR3 export gap; excluded w/ reopen condition)
+**✅ SOFR ROOT-CAUSED + RESOLVED (our side).** The order-time covariance NaN for SOFR = a DATA-within-CSV
+gap, confirmed by auditing the raw export CSVs (private/data/futures/csi/UA/Data/PST/SR3_*.csv, all 394):
+SOFR=CSI SR3 (CME 3m SOFR, quarterly IMM, roll -1000 INTENTIONAL per Rob). The DEFERRED quarterly chain is
+FROZEN at 2023-04-14 (deep-history one-time batch), while only the front quarterly (202606) + monthly serials
++ far forwards get the ongoing refresh -> the back-adjusted series has a 1183-day gap (2023-04 -> 2026-07)
+-> NaN variance -> optimiser auto-drops SOFR. NOT whole contracts missing (CSVs exist); NOT a roll/PST bug.
+Verified in-CSV: SR3_202609.csv trades in size on 2023-04-14 then 0 rows after; staged copy identical cutoff.
+CSI almost certainly HAS the data (contracts trade to expiry) -> it's a UA EXPORT-config gap (deferred
+quarterly chain not pulled past the deep batch).
+**FIX SPEC (user action): notes/reference/sofr_sr3_reexport_spec.md** -- re-export the 29 frozen SR3 quarterly
+contracts (202603/09/12, 202703...203012) with current end dates; extend the ongoing UA SR3 export to include
+the FULL deferred quarterly IMM chain (else it recurs). Then csi_sync_reingest SOFR --bootstrap -> continuous
+series -> re-include.
+**EXCLUSION (our side, done): explicit + regeneration-safe.** private/systems/rob_dynamic/instrument_
+exclusions.yaml (SOFR + reason + reopen_when); make_rob_dynamic_config.py now drops exclusions from the 3
+instrument-derived blocks on every regen (EXCLUSIONS const + logic, mirrors instrument_additions.yaml).
+Applied to live config: universe 117 -> **116** (SOFR out), vol 25% preserved; SOFR raw optimal-position
+record moved to private/data/parquet/_optimal_positions_excluded/. VERIFIED: order-time covariance now CLEAN
+(116x116, 0 NaNs). Data-quality exclusion (ex-ante, not P&L; see [[no-in-sample-fitting]]).
+**REOPEN CONDITION:** CSI SR3 re-export done -> delete SOFR from instrument_exclusions.yaml + re-add to config.
+NB: the standing daily refresh runs run_systems on the 116 config (SOFR excluded) automatically.
+
+--- (prior) ---
+
 ## ⏱ RESUME HERE (2026-07-17 — STANDING DAILY SCHEDULE WIRED + ENABLED)
 **✅ STANDING DAILY PAPER-TRADING SCHEDULE LIVE (systemd --user, Linger=yes, first fire Mon 2026-07-20).**
 Two timers (Mon-Fri, UTC), canonical processes, deliberate broker/non-broker split:
