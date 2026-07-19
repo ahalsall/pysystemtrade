@@ -6,6 +6,20 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-19 — CORE pre-trade limits CONFIGURED; custom-gate task closed)
+**Pre-trade safety = use Rob's CORE, not a custom wrapper.** Checked first (user's steer): pysystemtrade already
+enforces overrides + position limits at order-gen (strategy_order_handling.get_and_place_orders ->
+apply_overrides_and_position_limits) and trade limits + ADV/liquidity sizing in the stack handler -- all in OUR
+exact live path. They were just all "No limit" (unconfigured). So the fix was to CONFIGURE the core, not wrap it.
+**DONE:** set 117 abs **position limits** (dataPositionLimits) + 117 daily **trade limits** (dataTradeLimits),
+enforced automatically. Per-instrument cap = max(15, 4x capital notional) -- a generous fat-finger/scale-bug
+backstop (~30-60x headroom over normal positions -> never false-clamps; core CLAMPS to limit, doesn't halt).
+Derivation params in private/systems/rob_dynamic/risk_gate.yaml; reproducible via
+**sysinit/futures/set_core_position_limits.py --apply** (re-run after a capital/universe change). Verified:
+0 instruments left at "No limit". reconciliation_gate.py stays as a SUPPLEMENTARY read-only report (its unique
+adds vs core = aggregate gross-leverage + reconciliation view); NOT wired as a blocking wrapper. This closes the
+"wire reconciliation_gate as a pre-order precondition" earmark. [[keep-upstream-core-unmodified]]
+
 ## ⏱ RESUME HERE (2026-07-17 — SOFR: ✅ FIXED via IB-splice; rebuilt, re-included, 117, VERIFIED)
 **✅ DONE (signed off + executed).** ib_sofr_splice --rebuild activated the repair store (33 tails) + ran
 reingest(force_bootstrap) through the hooked stage(). Results VERIFIED:
