@@ -1,0 +1,19 @@
+[Unit]
+Description=pysystemtrade rob_dynamic stack handler (canonical single continuous broker manager; runs to its 19:45 UTC stop)
+Documentation=file:///home/andrew/pysystemtrade/sysproduction/run_stack_handler.py
+After=network-online.target pst-rob-refresh.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/andrew/pysystemtrade
+Environment=TZ=UTC
+# THE ONLY broker-facing component. Needs: IB Gateway UP, Read-Only OFF, no competing session.
+# Self-gates per instrument trading hours; exits cleanly at its configured stop time (19:45 UTC).
+# GATED LAUNCHER (added 2026-07-20 after the first auto-cycle): waits for today's refresh to finish
+# staging the book AND for IB Gateway to be up, THEN execs run_stack_handler -- so it no longer fires
+# on a bare 00:30 offset before the book/Gateway are ready. If either precondition never arrives it
+# exits clean (no restart); rerun once Gateway is up with: systemctl --user start pst-rob-stackhandler.service
+ExecStart=/home/andrew/pysystemtrade/sysinit/futures/run_stack_handler_gated.sh
+Restart=no
+Nice=5

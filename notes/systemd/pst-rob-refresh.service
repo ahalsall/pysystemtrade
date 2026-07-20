@@ -1,0 +1,14 @@
+[Unit]
+Description=pysystemtrade rob_dynamic daily pre-market refresh (csi_sync -> run_systems -> stage orders; NOT broker-facing)
+Documentation=file:///home/andrew/pysystemtrade/sysinit/futures/rob_daily_refresh.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/andrew/pysystemtrade
+Environment=TZ=UTC
+# Stages the day's instrument orders on the INTERNAL stack only. Places nothing at IB.
+ExecStart=/home/andrew/.local/bin/uv run python -m sysinit.futures.rob_daily_refresh
+TimeoutStartSec=3600
+Nice=10

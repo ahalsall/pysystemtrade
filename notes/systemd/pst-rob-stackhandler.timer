@@ -1,0 +1,10 @@
+[Unit]
+Description=Trigger rob_dynamic stack handler (start-of-day, weekdays UTC; requires IB Gateway up)
+
+[Timer]
+OnCalendar=Mon-Fri 00:30 UTC
+Persistent=false
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

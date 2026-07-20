@@ -6,6 +6,27 @@
 
 ---
 
+## ⏱ RESUME HERE (2026-07-20 — FIRST auto-cycle ran; 2 operational gaps FIXED)
+**First automated cycle (Mon 00:20 UTC): data half ✅, execution half ✗ — both root-caused + fixed.**
+- **Refresh ✅ clean:** csi_sync (141 synced) -> run_systems (117 incl SOFR) -> order_gen -> 16 orders staged,
+  DONE 01:07 UTC. Data->book->orders works automatically end-to-end.
+- **Stackhandler ✗:** fired 00:30 while IB Gateway was DOWN (Errno 111) -> failed clean, left a stale process
+  lock (cleared via dataControlProcess.check_if_pid_running_and_if_not_finish_all_processes). Then the LAPTOP
+  SUSPENDED 01:07->04:28 UTC (the known fragility) so nothing ever traded. Reconciliation clean (0 breaks);
+  broker positions unchanged (BITCOIN-2 DOW+3 GOLD_micro-1 JPY-1 SP500_micro+1).
+- **Stack accumulation:** stale Friday orders + today's piled up (16 = 7+9, 4 netting to zero) because the
+  handler never ran its end-of-day safe_stack_removal. **CLEARED** via safe_stack_removal (16->0).
+**FIX 1 — gated stackhandler launcher (sysinit/futures/run_stack_handler_gated.sh):** waits for today's
+refresh to finish cleanly AND IB Gateway (port 4002) up, THEN execs run_stack_handler. No more bare 00:30
+offset before book/Gateway ready. pst-rob-stackhandler.service ExecStart now points at it (+After=refresh).
+**FIX 2 — stack hygiene (rob_daily_refresh.py step 3/4):** clears leftover un-worked instrument orders BEFORE
+order_gen (guarded: only when contract+broker stacks empty; instrument-stack-only, no Gateway needed) so days
+don't accumulate. Best-effort (won't fail the refresh).
+**Also:** systemd units now MIRRORED in repo notes/systemd/ (were only in ~/.config) for VC + server portability.
+Next auto-cycle ~00:21 UTC will exercise both fixes. To trade TODAY: re-run order_gen (stack was cleared) then
+`systemctl --user start pst-rob-stackhandler.service` (launcher will proceed since today's refresh already
+succeeded + Gateway up). [[deployment-target]] (laptop-suspend is why execution didn't run; gone on the server).
+
 ## ⏱ RESUME HERE (2026-07-19 — CORE pre-trade limits CONFIGURED; custom-gate task closed)
 **Pre-trade safety = use Rob's CORE, not a custom wrapper.** Checked first (user's steer): pysystemtrade already
 enforces overrides + position limits at order-gen (strategy_order_handling.get_and_place_orders ->

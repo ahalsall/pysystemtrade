@@ -1,0 +1,10 @@
+[Unit]
+Description=Trigger rob_dynamic daily refresh (pre-market, weekdays UTC)
+
+[Timer]
+OnCalendar=Mon-Fri 00:20 UTC
+Persistent=true
+RandomizedDelaySec=90
+
+[Install]
+WantedBy=timers.target

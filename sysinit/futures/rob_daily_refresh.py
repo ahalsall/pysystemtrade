@@ -56,11 +56,31 @@ def order_gen():
     ).run_strategy_method()
 
 
+def clear_stale_orders():
+    # Stack hygiene: clear leftover un-worked instrument orders BEFORE order_gen so stale orders don't
+    # accumulate day-to-day when the stack handler didn't run to clean them (its end-of-day
+    # safe_stack_removal). Guarded: only clears when NOTHING is in flight (contract+broker stacks empty),
+    # so it can never disrupt live execution. Touches only the instrument stack -> no broker/Gateway needed.
+    from sysdata.data_blob import dataBlob
+    from sysexecution.stack_handler.stack_handler import stackHandler
+    sh = stackHandler(dataBlob())
+    if sh.contract_stack.get_list_of_order_ids() or sh.broker_stack.get_list_of_order_ids():
+        print("  in-flight orders present (contract/broker stack non-empty) -> SKIP hygiene", flush=True)
+        return
+    inst = sh.instrument_stack
+    stale = inst.get_list_of_order_ids()
+    for oid in stale:
+        inst.deactivate_order(oid)
+    inst.remove_all_deactivated_orders_from_stack()
+    print(f"  cleared {len(stale)} stale un-worked instrument order(s)", flush=True)
+
+
 def main():
     ok = True
-    ok = step("1/3 CSI incremental sync", csi_sync) and ok
-    ok = step("2/3 run_systems (optimal positions @ $250k)", run_systems) and ok
-    ok = step("3/3 order generator (stage instrument orders)", order_gen) and ok
+    ok = step("1/4 CSI incremental sync", csi_sync) and ok
+    ok = step("2/4 run_systems (optimal positions @ $250k)", run_systems) and ok
+    step("3/4 stack hygiene (clear stale un-worked orders)", clear_stale_orders)  # best-effort; don't fail the run
+    ok = step("4/4 order generator (stage instrument orders)", order_gen) and ok
     # report staged orders
     try:
         from sysdata.data_blob import dataBlob
